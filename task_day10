@@ -1,37 +1,110 @@
+Task 4 - 
+Write a simple HTTP client that connects to a URL, sends a request, and displays the response headers and body.
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.io.IOException;
+
+public class SimpleHttpClient {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        String url = "https://www.example.com"; // Replace with the URL you want to connect to
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET() // Or .POST(), .PUT(), .DELETE(), etc. as needed
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        System.out.println("Status Code: " + response.statusCode());
+
+        // Print headers (optional, but good practice)
+        System.out.println("\nHeaders:");
+        response.headers().map().forEach((k, v) -> System.out.println(k + ": " + v));
+
+        System.out.println("\nBody:");
+        System.out.println(response.body());
+    }
+}
+
 Task 5: Java Networking and Serialization
 Develop a basic TCP client and server application where the client sends a serialized object with 2 numbers and operation  to be performed on them to the server, and the server computes the result and sends it back to the client. for eg, we could send  2, 2, "+" which would mean 2 + 2
 
-package httpserver;
+// Server.java
+import java.io.*;
+import java.net.*;
 
-import com.sun.net.httpserver.HttpServer;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
+public class Server {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
+        try (ServerSocket serverSocket = new ServerSocket(12345);
+             Socket clientSocket = serverSocket.accept();
+             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+             ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
+            Calculation calc = (Calculation) in.readObject();
+            int result = calc.calculate();
+            out.writeObject(result);
 
-public class HttpServerApp {
-    public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
-        server.createContext("/login", new MyHandler());
-        server.setExecutor(null);
-        server.start();
-        System.out.println("Server is running on http://localhost:8000/login");
-    }
-
-    static class MyHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "Hello, this is a simple HTTP server response!";
-            exchange.sendResponseHeaders(200, response.length());
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(response.getBytes());
-            }
         }
     }
 }
 
+// Client.java
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+
+public class Client {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket("localhost", 12345);
+             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+             Scanner scanner = new Scanner(System.in)) {
+
+            System.out.print("Enter number 1: ");
+            int num1 = scanner.nextInt();
+            System.out.print("Enter number 2: ");
+            int num2 = scanner.nextInt();
+            System.out.print("Enter operation (+, -, *, /): ");
+            String operation = scanner.next();
+
+            Calculation calc = new Calculation(num1, num2, operation);
+            out.writeObject(calc);
+
+            int result = (int) in.readObject();
+            System.out.println("Result: " + result);
+
+        }
+    }
+}
+
+// Calculation.java (Same for both client and server)
+import java.io.Serializable;
+
+class Calculation implements Serializable {
+    int num1;
+    int num2;
+    String operation;
+
+    public Calculation(int num1, int num2, String operation) {
+        this.num1 = num1;
+        this.num2 = num2;
+        this.operation = operation;
+    }
+
+    public int calculate() {
+        switch (operation) {
+            case "+": return num1 + num2;
+            case "-": return num1 - num2;
+            case "*": return num1 * num2;
+            case "/": return num1 / num2; // No divide by zero check in this simplified version
+            default: throw new IllegalArgumentException("Invalid operation");
+        }
+    }
+}
 
 Day 8:
 Task 1: Establishing Database Connections
@@ -40,7 +113,6 @@ Write a Java program that connects to a SQLite database and prints out the conne
 Task 2: SQL Queries using JDBC
 Create a table 'User' with a following schema 'User ID' and 'Password' stored as hash format (note you have research on how to generate hash from a string), accept "User ID" and "Password" as input and check in the table if they match to confirm whether user access is allowed or not.
 
-package com.jdbc.crud;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -119,9 +191,7 @@ public class UserAuthentication {
 }
 
 
-Task3
-
-package com.jdbc.crud;
+Task3 - Modify the SELECT query program to use PreparedStatement to parameterize the query and prevent SQL injection.
 
 import java.sql.Connection;
 import java.sql.DriverManager;

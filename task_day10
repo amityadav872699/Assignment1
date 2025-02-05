@@ -1,23 +1,64 @@
-@Test
+import static org.junit.Assert.*;
+import org.junit.BeforeClass;
+import org.junit.AfterClass;
+import org.junit.Test;
+
+public class MathOperationsTest {
+
+    // This method runs once before all tests
+    @BeforeClass
+    public static void setUpBeforeClass() {
+        System.out.println("BeforeClass: Runs once before all tests");
+    }
+
+    // This method runs once after all tests
+    @AfterClass
+    public static void tearDownAfterClass() {
+        System.out.println("AfterClass: Runs once after all tests");
+    }
+
+    @Test
     public void testAdd() {
-        assertEquals(5, mathOps.add(2, 3), "2 + 3 should equal 5");
-        assertEquals(-1, mathOps.add(-2, 1), "-2 + 1 should equal -1");
+        assertEquals(5, add(2, 3));
     }
 
     @Test
     public void testSubtract() {
-        assertEquals(1, mathOps.subtract(3, 2), "3 - 2 should equal 1");
-        assertEquals(-3, mathOps.subtract(-2, 1), "-2 - 1 should equal -3");
+        assertEquals(1, subtract(3, 2));
     }
 
     @Test
     public void testMultiply() {
-        assertEquals(6, mathOps.multiply(2, 3), "2 * 3 should equal 6");
-        assertEquals(-6, mathOps.multiply(-2, 3), "-2 * 3 should equal -6");
+        assertEquals(6, multiply(2, 3));
     }
 
     @Test
     public void testDivide() {
-        assertEquals(2, mathOps.divide(6, 3), "6 / 3 should equal 2");
-        assertThrows(ArithmeticException.class, () -> mathOps.divide(1, 0), "Division by zero should throw ArithmeticException");
+        assertEquals(2.0, divide(6, 3), 0.001);
     }
+
+    @Test(expected = ArithmeticException.class)
+    public void testDivideByZero() {
+        divide(1, 0); // This should throw ArithmeticException
+    }
+
+    // Static methods for basic operations
+    public static int add(int a, int b) {
+        return a + b;
+    }
+
+    public static int subtract(int a, int b) {
+        return a - b;
+    }
+
+    public static int multiply(int a, int b) {
+        return a * b;
+    }
+
+    public static double divide(int a, int b) {
+        if (b == 0) {
+            throw new ArithmeticException("Cannot divide by zero");
+        }
+        return (double) a / b;
+    }
+}

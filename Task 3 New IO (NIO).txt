@@ -1,0 +1,173 @@
+Task 3: New IO (NIO)
+Use NIO Channels and Buffers to read content from a file and write to another file.
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+
+public class FileCopyNIO {
+
+    public static void copyFile(String source, String destination) throws IOException {
+        try (FileChannel in = FileChannel.open(Paths.get(source), StandardOpenOption.READ);
+             FileChannel out = FileChannel.open(Paths.get(destination), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+
+            ByteBuffer buffer = ByteBuffer.allocate(1024); // Buffer size
+
+            while (in.read(buffer) != -1) {
+                buffer.flip(); // Prepare buffer for writing
+                out.write(buffer);
+                buffer.clear(); // Prepare buffer for reading again
+            }
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        String sourceFile = "source.txt"; // Replace with your source file
+        String destinationFile = "destination.txt"; // Replace with your destination file
+
+        // Create a dummy source file if it doesn't exist.
+        if (!Files.exists(Paths.get(sourceFile))) {
+            Files.write(Paths.get(sourceFile), "This is some sample text.".getBytes());
+        }
+
+        FileCopyNIO.copyFile(sourceFile, destinationFile);
+        System.out.println("File copied successfully!");
+    }
+}
+Task 5: Java Networking and Serialization
+Develop a basic TCP client and server application where the client sends a serialized object with 2 numbers and operation  to be performed on them to the server, and the server computes the result and sends it back to the client. for eg, we could send  2, 2, "+" which would mean 2 + 2
+
+Day 8:
+Task 1: Establishing Database Connections
+Write a Java program that connects to a SQLite database and prints out the connection object to confirm successful connection.
+
+Task 2: SQL Queries using JDBC
+Create a table 'User' with a following schema 'User ID' and 'Password' stored as hash format (note you have research on how to generate hash from a string), accept "User ID" and "Password" as input and check in the table if they match to confirm whether user access is allowed or not.
+
+
+
+Task 3: Proxy
+Create a proxy class for accessing a sensitive object that contains a secret key. The proxy should only allow access to the secret key if a correct password is provided.
+
+class SensitiveData {
+    private String secretKey;
+
+    public SensitiveData(String secretKey) {
+        this.secretKey = secretKey;
+    }
+
+    public String getSecretKey() {
+        return secretKey;
+    }
+}
+
+class SensitiveDataProxy {
+    private SensitiveData sensitiveData;
+    private String password;
+
+    public SensitiveDataProxy(SensitiveData sensitiveData, String password) {
+        this.sensitiveData = sensitiveData;
+        this.password = password;
+    }
+
+    public String getSecretKey(String enteredPassword) {
+        if (enteredPassword.equals(password)) {
+            return sensitiveData.getSecretKey();
+        } else {
+            return "Incorrect password. Access denied.";
+        }
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        String realKey = "ThisIsTheRealSecretKey";
+        SensitiveData data = new SensitiveData(realKey);
+        String correctPassword = "mySecretPassword";
+        SensitiveDataProxy proxy = new SensitiveDataProxy(data, correctPassword);
+
+        // Try with correct password
+        String key1 = proxy.getSecretKey("mySecretPassword");
+        System.out.println("Access with correct password: " + key1);
+
+        // Try with incorrect password
+        String key2 = proxy.getSecretKey("wrongPassword");
+        System.out.println("Access with incorrect password: " + key2);
+
+
+        //Direct access to the sensitive data is not allowed
+        // data.getSecretKey();  This would bypass the proxy and should be avoided in real-world scenarios.
+
+    }
+}
+
+Task 4: Strategy
+Develop a Context class that can use different SortingStrategy algorithms interchangeably to sort a collection of numbers
+import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+
+interface SortingStrategy {
+    void sort(List<Integer> numbers);
+}
+
+class BubbleSort implements SortingStrategy {
+    @Override
+    public void sort(List<Integer> numbers) {
+        int n = numbers.size();
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - i - 1; j++) {
+                if (numbers.get(j) > numbers.get(j + 1)) {
+                    Collections.swap(numbers, j, j + 1); // More concise swap
+                }
+            }
+        }
+    }
+}
+
+class CollectionsSort implements SortingStrategy {
+    @Override
+    public void sort(List<Integer> numbers) {
+        Collections.sort(numbers);
+    }
+}
+
+class Context {
+    private SortingStrategy strategy;
+
+    public Context(SortingStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void setStrategy(SortingStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public List<Integer> sortNumbers(List<Integer> numbers) {
+        List<Integer> copy = new ArrayList<>(numbers); // Important: Create a copy!
+        strategy.sort(copy);
+        return copy; // Return the sorted copy
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> numbers = Arrays.asList(5, 1, 8, 2, 9, 3);
+
+        // Using Bubble Sort
+        Context context = new Context(new BubbleSort());
+        List<Integer> sortedBubble = context.sortNumbers(numbers);
+        System.out.println("Sorted with Bubble Sort: " + sortedBubble);
+
+        // Using Collections Sort
+        context.setStrategy(new CollectionsSort());
+        List<Integer> sortedCollections = context.sortNumbers(numbers);
+        System.out.println("Sorted with Collections Sort: " + sortedCollections);
+
+        System.out.println("Original list: " + numbers); // Original list remains unchanged
+    }
+}

@@ -110,6 +110,24 @@ Day 8:
 Task 1: Establishing Database Connections
 Write a Java program that connects to a SQLite database and prints out the connection object to confirm successful connection.
 
+if (conn != null) {
+                System.out.println("Connection to SQLite has been established.");
+                System.out.println("Connection Object: " + conn);
+            }
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        } finally {
+            try {
+                if (conn != null) {
+                    conn.close();
+                    System.out.println("Connection closed.");
+                }
+            } catch (SQLException ex) {
+                System.out.println(ex.getMessage());
+            }
+        }
+
 Task 2: SQL Queries using JDBC
 Create a table 'User' with a following schema 'User ID' and 'Password' stored as hash format (note you have research on how to generate hash from a string), accept "User ID" and "Password" as input and check in the table if they match to confirm whether user access is allowed or not.
 

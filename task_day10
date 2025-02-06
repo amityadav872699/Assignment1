@@ -1,64 +1,28 @@
-import static org.junit.Assert.*;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
-
-public class MathOperationsTest {
-
-    // This method runs once before all tests
-    @BeforeClass
-    public static void setUpBeforeClass() {
-        System.out.println("BeforeClass: Runs once before all tests");
-    }
-
-    // This method runs once after all tests
-    @AfterClass
-    public static void tearDownAfterClass() {
-        System.out.println("AfterClass: Runs once after all tests");
-    }
-
-    @Test
-    public void testAdd() {
-        assertEquals(5, add(2, 3));
-    }
-
-    @Test
-    public void testSubtract() {
-        assertEquals(1, subtract(3, 2));
-    }
-
-    @Test
-    public void testMultiply() {
-        assertEquals(6, multiply(2, 3));
-    }
-
-    @Test
-    public void testDivide() {
-        assertEquals(2.0, divide(6, 3), 0.001);
-    }
-
-    @Test(expected = ArithmeticException.class)
-    public void testDivideByZero() {
-        divide(1, 0); // This should throw ArithmeticException
-    }
-
-    // Static methods for basic operations
-    public static int add(int a, int b) {
-        return a + b;
-    }
-
-    public static int subtract(int a, int b) {
-        return a - b;
-    }
-
-    public static int multiply(int a, int b) {
-        return a * b;
-    }
-
-    public static double divide(int a, int b) {
-        if (b == 0) {
-            throw new ArithmeticException("Cannot divide by zero");
-        }
-        return (double) a / b;
-    }
-}
+<dependencies>
+<dependency>
+<groupId>org.springframework</groupId>
+<artifactId>spring-core</artifactId>
+<version>5.2.3.RELEASE</version>
+</dependency>
+<!--  https://mvnrepository.com/artifact/org.springframework/spring-context  -->
+<dependency>
+<groupId>org.springframework</groupId>
+<artifactId>spring-context</artifactId>
+<version>5.2.3.RELEASE</version>
+</dependency>
+<!--  https://mvnrepository.com/artifact/org.springframework/spring-orm  -->
+<dependency>
+<groupId>org.springframework</groupId>
+<artifactId>spring-orm</artifactId>
+<version>5.2.3.RELEASE</version>
+</dependency>
+<dependency>
+<groupId>org.hibernate</groupId>
+<artifactId>hibernate-core</artifactId>
+<version>5.4.2.Final</version>
+</dependency>
+<dependency>
+<groupId>com.mysql</groupId>
+<artifactId>mysql-connector-j</artifactId>
+<version>8.3.0</version>
+</dependency>

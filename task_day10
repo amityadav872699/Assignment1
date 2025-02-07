@@ -1,47 +1,262 @@
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+task 1
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 
-public class CalculatorTest {
+public enum Database {
+    INSTANCE;  // Enum singleton - simplest and thread-safe
 
-    @Test
-    public void testAdd() {
-        assertEquals(5, Calculator.add(2, 3), "2 + 3 should equal 5");
-        assertEquals(0, Calculator.add(-2, 2), "-2 + 2 should equal 0");
-        assertEquals(-5, Calculator.add(-3, -2), "-3 + -2 should equal -5");
+    private Connection connection;
 
-        assertTrue(Calculator.add(3, 2) > 0, "The result should be positive");
-        assertFalse(Calculator.add(-3, 1) > 0, "The result should not be positive");
+    Database() { // Constructor is private
+        try {
+            String url = "jdbc:sqlite::memory:"; // Example: In-memory SQLite
+            connection = DriverManager.getConnection(url);
+            System.out.println("DB connected");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
-    @Test
-    public void testSub() {
-        assertEquals(1, Calculator.sub(3, 2), "3 - 2 should equal 1");
-        assertEquals(-4, Calculator.sub(-2, 2), "-2 - 2 should equal -4");
-        assertEquals(0, Calculator.sub(2, 2), "2 - 2 should equal 0");
-
-        assertTrue(Calculator.sub(5, 3) > 0, "The result should be positive");
-        assertFalse(Calculator.sub(2, 5) > 0, "The result should not be positive");
+    public Connection getConnection() {
+        return connection;
     }
 
-    @Test
-    public void testMul() {
-        assertEquals(6, Calculator.mul(2, 3), "2 * 3 should equal 6");
-        assertEquals(-4, Calculator.mul(-2, 2), "-2 * 2 should equal -4");
-        assertEquals(0, Calculator.mul(0, 5), "0 * 5 should equal 0");
-
-        assertTrue(Calculator.mul(3, 2) > 0, "The result should be positive");
-        assertFalse(Calculator.mul(-3, 2) > 0, "The result should not be positive");
+    public void close() {
+        if (connection != null) {
+            try {
+                connection.close();
+                System.out.println("DB closed");
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    @Test
-    public void testDiv() {
-        assertEquals(2, Calculator.div(6, 3), "6 / 3 should equal 2");
-        assertEquals(-3, Calculator.div(-6, 2), "-6 / 2 should equal -3");
+    public static void main(String[] args) {
+        Database db1 = Database.INSTANCE;
+        Database db2 = Database.INSTANCE; // Same instance
 
-        assertTrue(Calculator.div(10, 2) > 0, "The result should be positive");
-        assertFalse(Calculator.div(-10, 2) > 0, "The result should not be positive");
+        System.out.println(db1 == db2); // Output: true
 
-        // Check exception for division by zero
-        assertThrows(IllegalArgumentException.class, () -> Calculator.div(1, 0), "Division by zero should throw an exception");
+        Connection conn = db1.getConnection();
+        try {
+            // Use the connection...
+            java.sql.Statement statement = conn.createStatement();
+            statement.execute("CREATE TABLE IF NOT EXISTS example (id INTEGER PRIMARY KEY, name TEXT)");
+            statement.execute("INSERT INTO example (name) VALUES ('Test')");
+            statement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        db1.close(); // Close the connection
+
+        Database db3 = Database.INSTANCE; // Access after close
+        System.out.println(db1 == db3); // Output: true (Singleton remains)
+        db3.close();
+
     }
 }
+
+
+/////task 2
+// Shape interface
+interface Shape {
+    void draw();
+}
+
+// Circle class
+class Circle implements Shape {
+    @Override
+    public void draw() {
+        System.out.println("Drawing a Circle");
+    }
+}
+
+// Square class
+class Square implements Shape {
+    @Override
+    public void draw() {
+        System.out.println("Drawing a Square");
+    }
+}
+
+// Rectangle class
+class Rectangle implements Shape {
+    @Override
+    public void draw() {
+        System.out.println("Drawing a Rectangle");
+    }
+}
+
+// ShapeFactory class
+class ShapeFactory {
+
+    public Shape getShape(String shapeType) {
+        if (shapeType == null) {
+            return null;
+        }
+
+        if (shapeType.equalsIgnoreCase("CIRCLE")) {
+            return new Circle();
+
+        } else if (shapeType.equalsIgnoreCase("SQUARE")) {
+            return new Square();
+
+        } else if (shapeType.equalsIgnoreCase("RECTANGLE")) {
+            return new Rectangle();
+        }
+
+        return null;
+    }
+}
+
+// Example usage
+public class FactoryPatternDemo {
+    public static void main(String[] args) {
+
+        ShapeFactory shapeFactory = new ShapeFactory();
+
+        // Get and draw a Circle
+        Shape circle = shapeFactory.getShape("CIRCLE");
+        circle.draw();
+
+        // Get and draw a Square
+        Shape square = shapeFactory.getShape("SQUARE");
+        square.draw();
+
+        // Get and draw a Rectangle
+        Shape rectangle = shapeFactory.getShape("RECTANGLE");
+        rectangle.draw();
+
+
+        // Demonstrating null handling:
+        Shape nullShape = shapeFactory.getShape(null); // No shape created
+        if (nullShape == null) {
+          System.out.println("No shape requested or invalid shape type.");
+        }
+
+        Shape invalidShape = shapeFactory.getShape("Triangle"); // Invalid shape type
+        if (invalidShape == null) {
+          System.out.println("No shape requested or invalid shape type.");
+        }
+
+
+    }
+}
+
+///////
+task 3
+interface SensitiveData {
+    String getSecretKey();
+}
+
+class RealSensitiveData implements SensitiveData {
+    private String secretKey;
+
+    public RealSensitiveData(String key) {
+        this.secretKey = key;
+    }
+
+    @Override
+    public String getSecretKey() {
+        return secretKey;
+    }
+}
+
+class SensitiveDataProxy implements SensitiveData {
+    private RealSensitiveData realData;
+    private String password;
+
+    public SensitiveDataProxy(String key, String password) {
+        this.realData = new RealSensitiveData(key);
+        this.password = password;
+    }
+
+    @Override
+    public String getSecretKey() {
+        if ("correctPassword".equals(password)) { // Simplified password check
+            return realData.getSecretKey();
+        }
+        return "Access Denied"; // Simplified denial
+    }
+}
+
+public class ProxyPatternDemo {
+    public static void main(String[] args) {
+        SensitiveData data = new SensitiveDataProxy("myKey", "correctPassword");
+        System.out.println(data.getSecretKey());
+
+        data = new SensitiveDataProxy("myKey", "wrongPassword");
+        System.out.println(data.getSecretKey());
+    }
+}
+Task 4
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+
+interface SortingStrategy {
+    void sort(List<Integer> numbers);
+}
+
+class BubbleSort implements SortingStrategy {
+    @Override
+    public void sort(List<Integer> numbers) {
+        int n = numbers.size();
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - i - 1; j++) {
+                if (numbers.get(j) > numbers.get(j + 1)) {
+                    Collections.swap(numbers, j, j + 1); // More concise swap
+                }
+            }
+        }
+    }
+}
+
+class CollectionsSort implements SortingStrategy {
+    @Override
+    public void sort(List<Integer> numbers) {
+        Collections.sort(numbers);
+    }
+}
+
+class Context {
+    private SortingStrategy strategy;
+
+    public Context(SortingStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void setStrategy(SortingStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public List<Integer> sortNumbers(List<Integer> numbers) {
+        List<Integer> copy = new ArrayList<>(numbers); // Important: Create a copy!
+        strategy.sort(copy);
+        return copy; // Return the sorted copy
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> numbers = Arrays.asList(5, 1, 8, 2, 9, 3);
+
+        // Using Bubble Sort
+        Context context = new Context(new BubbleSort());
+        List<Integer> sortedBubble = context.sortNumbers(numbers);
+        System.out.println("Sorted with Bubble Sort: " + sortedBubble);
+
+        // Using Collections Sort
+        context.setStrategy(new CollectionsSort());
+        List<Integer> sortedCollections = context.sortNumbers(numbers);
+        System.out.println("Sorted with Collections Sort: " + sortedCollections);
+
+        System.out.println("Original list: " + numbers); // Original list remains unchanged
+    }
+}
+

@@ -17,21 +17,38 @@ public class ReflectionExample {
 
 
 gc
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
 import java.util.List;
 
-public class SimpleGCComparison {
-
+public class GarbageCollectorComparison {
     public static void main(String[] args) {
-        System.out.println("Available Garbage Collectors:");
+        System.out.println("Starting Garbage Collector Comparison...");
+        long startTime = System.currentTimeMillis();
 
-        List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
-        for (GarbageCollectorMXBean gcBean : gcBeans) {
-            System.out.println("- " + gcBean.getName());
+        List<byte[]> memoryConsumers = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < 10000; i++) {
+                // Allocate 1MB objects to simulate heavy memory usage
+                byte[] data = new byte[1024 * 1024];
+                memoryConsumers.add(data);
+
+                // Occasionally remove some objects to simulate garbage collection
+                if (i % 50 == 0 && !memoryConsumers.isEmpty()) {
+                    memoryConsumers.remove(0);
+                }
+
+                // Encourage GC to kick in
+                if (i % 1000 == 0) {
+                    System.gc();
+                }
+            }
+        } catch (OutOfMemoryError e) {
+            System.err.println("OutOfMemoryError encountered!");
         }
 
-        System.out.println("\n(Run with different -XX:+Use*GC options to experiment)");
-        System.out.println("Example: java -XX:+UseG1GC SimpleGCComparison");
+        long endTime = System.currentTimeMillis();
+        System.out.println("Execution Time: " + (endTime - startTime) + " ms");
     }
 }
+

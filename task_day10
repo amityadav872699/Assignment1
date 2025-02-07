@@ -1,262 +1,37 @@
-task 1
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import java.lang.reflect.Field;
 
-public enum Database {
-    INSTANCE;  // Enum singleton - simplest and thread-safe
+class MyClass {
+    private String secret = "Initial Value";
+}
 
-    private Connection connection;
-
-    Database() { // Constructor is private
-        try {
-            String url = "jdbc:sqlite::memory:"; // Example: In-memory SQLite
-            connection = DriverManager.getConnection(url);
-            System.out.println("DB connected");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public Connection getConnection() {
-        return connection;
-    }
-
-    public void close() {
-        if (connection != null) {
-            try {
-                connection.close();
-                System.out.println("DB closed");
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        Database db1 = Database.INSTANCE;
-        Database db2 = Database.INSTANCE; // Same instance
-
-        System.out.println(db1 == db2); // Output: true
-
-        Connection conn = db1.getConnection();
-        try {
-            // Use the connection...
-            java.sql.Statement statement = conn.createStatement();
-            statement.execute("CREATE TABLE IF NOT EXISTS example (id INTEGER PRIMARY KEY, name TEXT)");
-            statement.execute("INSERT INTO example (name) VALUES ('Test')");
-            statement.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        db1.close(); // Close the connection
-
-        Database db3 = Database.INSTANCE; // Access after close
-        System.out.println(db1 == db3); // Output: true (Singleton remains)
-        db3.close();
-
+public class ReflectionExample {
+    public static void main(String[] args) throws Exception {
+        MyClass obj = new MyClass();
+        Field field = MyClass.class.getDeclaredField("secret");
+        field.setAccessible(true);
+        System.out.println("Original: " + field.get(obj));
+        field.set(obj, "New Value");
+        System.out.println("Modified: " + field.get(obj));
     }
 }
 
 
-/////task 2
-// Shape interface
-interface Shape {
-    void draw();
-}
-
-// Circle class
-class Circle implements Shape {
-    @Override
-    public void draw() {
-        System.out.println("Drawing a Circle");
-    }
-}
-
-// Square class
-class Square implements Shape {
-    @Override
-    public void draw() {
-        System.out.println("Drawing a Square");
-    }
-}
-
-// Rectangle class
-class Rectangle implements Shape {
-    @Override
-    public void draw() {
-        System.out.println("Drawing a Rectangle");
-    }
-}
-
-// ShapeFactory class
-class ShapeFactory {
-
-    public Shape getShape(String shapeType) {
-        if (shapeType == null) {
-            return null;
-        }
-
-        if (shapeType.equalsIgnoreCase("CIRCLE")) {
-            return new Circle();
-
-        } else if (shapeType.equalsIgnoreCase("SQUARE")) {
-            return new Square();
-
-        } else if (shapeType.equalsIgnoreCase("RECTANGLE")) {
-            return new Rectangle();
-        }
-
-        return null;
-    }
-}
-
-// Example usage
-public class FactoryPatternDemo {
-    public static void main(String[] args) {
-
-        ShapeFactory shapeFactory = new ShapeFactory();
-
-        // Get and draw a Circle
-        Shape circle = shapeFactory.getShape("CIRCLE");
-        circle.draw();
-
-        // Get and draw a Square
-        Shape square = shapeFactory.getShape("SQUARE");
-        square.draw();
-
-        // Get and draw a Rectangle
-        Shape rectangle = shapeFactory.getShape("RECTANGLE");
-        rectangle.draw();
-
-
-        // Demonstrating null handling:
-        Shape nullShape = shapeFactory.getShape(null); // No shape created
-        if (nullShape == null) {
-          System.out.println("No shape requested or invalid shape type.");
-        }
-
-        Shape invalidShape = shapeFactory.getShape("Triangle"); // Invalid shape type
-        if (invalidShape == null) {
-          System.out.println("No shape requested or invalid shape type.");
-        }
-
-
-    }
-}
-
-///////
-task 3
-interface SensitiveData {
-    String getSecretKey();
-}
-
-class RealSensitiveData implements SensitiveData {
-    private String secretKey;
-
-    public RealSensitiveData(String key) {
-        this.secretKey = key;
-    }
-
-    @Override
-    public String getSecretKey() {
-        return secretKey;
-    }
-}
-
-class SensitiveDataProxy implements SensitiveData {
-    private RealSensitiveData realData;
-    private String password;
-
-    public SensitiveDataProxy(String key, String password) {
-        this.realData = new RealSensitiveData(key);
-        this.password = password;
-    }
-
-    @Override
-    public String getSecretKey() {
-        if ("correctPassword".equals(password)) { // Simplified password check
-            return realData.getSecretKey();
-        }
-        return "Access Denied"; // Simplified denial
-    }
-}
-
-public class ProxyPatternDemo {
-    public static void main(String[] args) {
-        SensitiveData data = new SensitiveDataProxy("myKey", "correctPassword");
-        System.out.println(data.getSecretKey());
-
-        data = new SensitiveDataProxy("myKey", "wrongPassword");
-        System.out.println(data.getSecretKey());
-    }
-}
-Task 4
-
-import java.util.Arrays;
+gc
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Collections;
 
-interface SortingStrategy {
-    void sort(List<Integer> numbers);
-}
+public class SimpleGCComparison {
 
-class BubbleSort implements SortingStrategy {
-    @Override
-    public void sort(List<Integer> numbers) {
-        int n = numbers.size();
-        for (int i = 0; i < n - 1; i++) {
-            for (int j = 0; j < n - i - 1; j++) {
-                if (numbers.get(j) > numbers.get(j + 1)) {
-                    Collections.swap(numbers, j, j + 1); // More concise swap
-                }
-            }
-        }
-    }
-}
-
-class CollectionsSort implements SortingStrategy {
-    @Override
-    public void sort(List<Integer> numbers) {
-        Collections.sort(numbers);
-    }
-}
-
-class Context {
-    private SortingStrategy strategy;
-
-    public Context(SortingStrategy strategy) {
-        this.strategy = strategy;
-    }
-
-    public void setStrategy(SortingStrategy strategy) {
-        this.strategy = strategy;
-    }
-
-    public List<Integer> sortNumbers(List<Integer> numbers) {
-        List<Integer> copy = new ArrayList<>(numbers); // Important: Create a copy!
-        strategy.sort(copy);
-        return copy; // Return the sorted copy
-    }
-}
-
-public class Main {
     public static void main(String[] args) {
-        List<Integer> numbers = Arrays.asList(5, 1, 8, 2, 9, 3);
+        System.out.println("Available Garbage Collectors:");
 
-        // Using Bubble Sort
-        Context context = new Context(new BubbleSort());
-        List<Integer> sortedBubble = context.sortNumbers(numbers);
-        System.out.println("Sorted with Bubble Sort: " + sortedBubble);
+        List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+        for (GarbageCollectorMXBean gcBean : gcBeans) {
+            System.out.println("- " + gcBean.getName());
+        }
 
-        // Using Collections Sort
-        context.setStrategy(new CollectionsSort());
-        List<Integer> sortedCollections = context.sortNumbers(numbers);
-        System.out.println("Sorted with Collections Sort: " + sortedCollections);
-
-        System.out.println("Original list: " + numbers); // Original list remains unchanged
+        System.out.println("\n(Run with different -XX:+Use*GC options to experiment)");
+        System.out.println("Example: java -XX:+UseG1GC SimpleGCComparison");
     }
 }
-

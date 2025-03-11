@@ -4,7 +4,6 @@ import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
 import org.snmp4j.transport.*;
 import java.io.IOException;
-import java.util.*;
 
 public class SNMPClient {
     private static final String SNMP_COMMUNITY = "public";
@@ -27,14 +26,15 @@ public class SNMPClient {
             target.setTimeout(5000);
             target.setRetries(3);
 
-            Map<String, String> systemData = new HashMap<>();
-            systemData.put("System Uptime", getSNMPData(snmp, target, OID_SYS_UPTIME));
-            systemData.put("CPU Usage", getSNMPData(snmp, target, OID_CPU_USAGE));
-            systemData.put("Memory Usage", getSNMPData(snmp, target, OID_MEMORY_USAGE));
+            String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
+            String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
+            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE));
 
             System.out.println("SNMP Device System Information:");
             System.out.println("--------------------------------");
-            systemData.forEach((key, value) -> System.out.println(key + ": " + value));
+            System.out.println("System Uptime: " + systemUptime);
+            System.out.println("CPU Usage: " + cpuUsage);
+            System.out.println("Memory Usage: " + memoryUsage);
 
             snmp.close();
         } catch (IOException e) {
@@ -63,6 +63,27 @@ public class SNMPClient {
             }
         } catch (Exception e) {
             return "Exception: " + e.getMessage();
+        }
+    }
+
+    private static String formatUptime(String uptime) {
+        try {
+            String[] parts = uptime.split(":");
+            int hours = Integer.parseInt(parts[0]);
+            int minutes = Integer.parseInt(parts[1]);
+            return hours + " hours " + minutes + " minutes";
+        } catch (Exception e) {
+            return uptime; // Return the raw value if parsing fails
+        }
+    }
+
+    private static String formatMemory(String memoryUsage) {
+        try {
+            long memoryBytes = Long.parseLong(memoryUsage);
+            long memoryMB = memoryBytes / (1024 * 1024); // Convert bytes to MB
+            return memoryMB + " MB";
+        } catch (NumberFormatException e) {
+            return memoryUsage; // Return the raw value if parsing fails
         }
     }
 }

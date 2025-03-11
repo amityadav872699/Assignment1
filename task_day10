@@ -77,13 +77,20 @@ public class SNMPClient {
         }
     }
 
-    private static String formatMemory(String memoryUsage) {
-        try {
-            long memoryBytes = Long.parseLong(memoryUsage);
-            long memoryMB = memoryBytes / (1024 * 1024); // Convert bytes to MB
-            return memoryMB + " MB";
-        } catch (NumberFormatException e) {
-            return memoryUsage; // Return the raw value if parsing fails
+    private static String formatMemory(String memoryUsage, String totalMemory) {
+    try {
+        long usedMemoryBytes = Long.parseLong(memoryUsage);
+        long totalMemoryBytes = Long.parseLong(totalMemory);
+        
+        if (totalMemoryBytes == 0) {
+            return "Error: Total memory cannot be zero";
         }
+        
+        int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes); // Calculate percentage
+        return percentage + "%";
+    } catch (NumberFormatException e) {
+        return "Invalid memory data"; // Handle parsing errors
     }
+}
+
 }

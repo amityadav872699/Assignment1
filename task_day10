@@ -3,35 +3,41 @@ import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
 import org.snmp4j.transport.*;
-import org.snmp4j.util.TreeUtils;
 
 import java.io.IOException;
-import java.util.List;
 
-public class SNMPClientExample {
+public class SNMPClientFormatted {
 
     private static final String SNMP_COMMUNITY = "public"; // Default SNMP community string
     private static final String SNMP_HOST = "192.168.56.1"; // SNMP device IP
     private static final int SNMP_PORT = 161; // SNMP port (default 161)
-    private static final String OID_SYS_DESCR = ".1.3.6.1.2.1.1.1.0"; // Example OID for SNMP GET
+
+    // OIDs
+    private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0"; // System Uptime OID
+    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.2021.11.9.0"; // Example CPU usage OID
+    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.2021.4.11.0"; // Example Memory usage OID
 
     public static void main(String[] args) {
         try {
-            // Step 1: Establish SNMP communication
+            // Establish SNMP communication
             TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
             Snmp snmp = new Snmp(transport);
             snmp.listen();
 
+            // Create SNMP target
             CommunityTarget target = createTarget(SNMP_HOST, SNMP_PORT, SNMP_COMMUNITY);
 
-            // Step 2: Perform SNMP GET request
-            System.out.println("Performing SNMP GET Request:");
-            String sysDescr = snmpGet(snmp, target, OID_SYS_DESCR);
-            System.out.println("System Description: " + sysDescr);
+            // Retrieve and format data
+            String systemUptime = formatUptime(snmpGet(snmp, target, OID_SYS_UPTIME));
+            String cpuUsage = formatPercentage(snmpGet(snmp, target, OID_CPU_USAGE));
+            String memoryUsage = formatPercentage(snmpGet(snmp, target, OID_MEMORY_USAGE));
 
-            // Step 3: Perform SNMP WALK request
-            System.out.println("\nPerforming SNMP WALK Request:");
-            snmpWalk(snmp, target, ".1.3.6.1.2.1.1"); // Example base OID for system group
+            // Display formatted output
+            System.out.println("SNMP Device System Information:");
+            System.out.println("--------------------------------");
+            System.out.println("System Uptime: " + systemUptime);
+            System.out.println("CPU Usage: " + cpuUsage);
+            System.out.println("Memory Usage: " + memoryUsage);
 
             // Close the SNMP session
             snmp.close();
@@ -73,26 +79,24 @@ public class SNMPClientExample {
         }
     }
 
-    private static void snmpWalk(Snmp snmp, CommunityTarget target, String baseOid) {
+    private static String formatUptime(String rawUptime) {
         try {
-            TreeUtils treeUtils = new TreeUtils(snmp, new DefaultPDUFactory());
-            List<TreeEvent> events = treeUtils.getSubtree(target, new OID(baseOid));
-
-            if (events == null || events.isEmpty()) {
-                System.out.println("No results returned for SNMP WALK.");
-                return;
-            }
-
-            for (TreeEvent event : events) {
-                if (event == null || event.getVariableBindings() == null) {
-                    continue;
-                }
-                for (VariableBinding vb : event.getVariableBindings()) {
-                    System.out.println(vb.getOid() + " = " + vb.getVariable());
-                }
-            }
+            long uptimeTicks = Long.parseLong(rawUptime); // Uptime in ticks (1 tick = 1/100 seconds)
+            long seconds = uptimeTicks / 100;
+            long hours = seconds / 3600;
+            long minutes = (seconds % 3600) / 60;
+            return hours + " hours " + minutes + " minutes";
         } catch (Exception e) {
-            System.out.println("Error during SNMP WALK: " + e.getMessage());
+            return "Invalid Uptime Data";
+        }
+    }
+
+    private static String formatPercentage(String rawValue) {
+        try {
+            // Assume the raw value is already a percentage value for simplicity
+            return Integer.parseInt(rawValue) + "%";
+        } catch (Exception e) {
+            return "Invalid Percentage Data";
         }
     }
 }

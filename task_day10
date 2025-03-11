@@ -1,54 +1,80 @@
-import java.lang.reflect.Field;
+package com.wipro.milestone;
 
-class MyClass {
-    private String secret = "Initial Value";
-}
+import org.snmp4j.*;
+import org.snmp4j.smi.*;
+import org.snmp4j.transport.*;
+import org.snmp4j.mp.*;
+import org.snmp4j.event.*;
 
-public class ReflectionExample {
-    public static void main(String[] args) throws Exception {
-        MyClass obj = new MyClass();
-        Field field = MyClass.class.getDeclaredField("secret");
-        field.setAccessible(true);
-        System.out.println("Original: " + field.get(obj));
-        field.set(obj, "New Value");
-        System.out.println("Modified: " + field.get(obj));
-    }
-}
+public class SNMP {
 
+    private static final String SNMP_VERSION = "2c"; // SNMP version
+    private static final String COMMUNITY = "public"; // SNMP community string
+    private static final String HOST = "127.0.0.1"; // Target device IP
+    private static final int PORT = 161; // SNMP port
 
-gc
-import java.util.ArrayList;
-import java.util.List;
+    private static final String OID_UPTIME = ".1.3.6.1.2.1.1.3.0"; // OID for system uptime
+    private static final String OID_CPU = "<CPU_USAGE_OID>"; // Replace with the actual OID for CPU usage
+    private static final String OID_MEMORY = "<MEMORY_USAGE_OID>"; // Replace with the actual OID for memory usage
 
-public class GarbageCollectorComparison {
     public static void main(String[] args) {
-        System.out.println("Starting Garbage Collector Comparison...");
-        long startTime = System.currentTimeMillis();
-
-        List<byte[]> memoryConsumers = new ArrayList<>();
-
         try {
-            for (int i = 0; i < 10000; i++) {
-                // Allocate 1MB objects to simulate heavy memory usage
-                byte[] data = new byte[1024 * 1024];
-                memoryConsumers.add(data);
+            Address targetAddress = new UdpAddress(HOST + "/" + PORT);
 
-                // Occasionally remove some objects to simulate garbage collection
-                if (i % 50 == 0 && !memoryConsumers.isEmpty()) {
-                    memoryConsumers.remove(0);
-                }
+            TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
+            transport.listen();
 
-                // Encourage GC to kick in
-                if (i % 1000 == 0) {
-                    System.gc();
-                }
-            }
-        } catch (OutOfMemoryError e) {
-            System.err.println("OutOfMemoryError encountered!");
+            CommunityTarget target = new CommunityTarget();
+            target.setCommunity(new OctetString(COMMUNITY));
+            target.setAddress(targetAddress);
+            target.setRetries(2);
+            target.setTimeout(1500);
+            target.setVersion(SnmpConstants.version2c);
+
+            Snmp snmp = new Snmp(transport);
+
+            // Retrieve System Uptime
+            String uptime = getSnmpValue(snmp, target, OID_UPTIME);
+
+            // Retrieve CPU Usage
+            String cpuUsage = getSnmpValue(snmp, target, OID_CPU);
+
+            // Retrieve Memory Usage
+            String memoryUsage = getSnmpValue(snmp, target, OID_MEMORY);
+
+            System.out.println("SNMP Device System Information:");
+            System.out.println("--------------------------------");
+            System.out.println("System Uptime: " + uptime);
+            System.out.println("CPU Usage: " + cpuUsage);
+            System.out.println("Memory Usage: " + memoryUsage);
+
+            snmp.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+    }
 
-        long endTime = System.currentTimeMillis();
-        System.out.println("Execution Time: " + (endTime - startTime) + " ms");
+    private static String getSnmpValue(Snmp snmp, CommunityTarget target, String oid) {
+        try {
+            PDU pdu = new PDU();
+            pdu.add(new VariableBinding(new OID(oid)));
+            pdu.setType(PDU.GET);
+
+            ResponseEvent response = snmp.send(pdu, target);
+
+            if (response != null && response.getResponse() != null) {
+                PDU responsePDU = response.getResponse();
+                if (responsePDU.getErrorStatus() == PDU.noError) {
+                    return responsePDU.getVariableBindings().get(0).getVariable().toString();
+                } else {
+                    System.err.println("Error: " + responsePDU.getErrorStatusText());
+                }
+            } else {
+                System.err.println("Error: No response from device.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "N/A";
     }
 }
-

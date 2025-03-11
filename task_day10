@@ -10,9 +10,8 @@ public class SNMPClient {
     private static final String SNMP_HOST = "192.168.56.1";
     private static final int SNMP_PORT = 161;
     private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
-    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
-    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
-    private static final String OID_TOTAL_MEMORY = ".1.3.6.1.4.1.9.9.48.1.1.1.5.1";
+    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.2021.11.9.0";
+    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.2021.4.11.0";
 
     public static void main(String[] args) {
         try {
@@ -29,7 +28,7 @@ public class SNMPClient {
 
             String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
             String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
-            String memoryUsage = calculateMemoryPercentage(snmp, target);
+            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE));
 
             System.out.println("SNMP Device System Information:");
             System.out.println("--------------------------------");
@@ -69,28 +68,22 @@ public class SNMPClient {
 
     private static String formatUptime(String uptime) {
         try {
-            long timeTicks = Long.parseLong(uptime);
-            long totalSeconds = timeTicks / 100; // Convert time ticks to seconds
-            long hours = totalSeconds / 3600;
-            long minutes = (totalSeconds % 3600) / 60;
+            String[] parts = uptime.split(":");
+            int hours = Integer.parseInt(parts[0]);
+            int minutes = Integer.parseInt(parts[1]);
             return hours + " hours " + minutes + " minutes";
         } catch (Exception e) {
-            return uptime;
+            return uptime; // Return the raw value if parsing fails
         }
     }
 
-    private static String calculateMemoryPercentage(Snmp snmp, CommunityTarget target) {
+    private static String formatMemory(String memoryUsage) {
         try {
-            String usedMemoryStr = getSNMPData(snmp, target, OID_MEMORY_USAGE);
-            String totalMemoryStr = getSNMPData(snmp, target, OID_TOTAL_MEMORY);
-
-            long usedMemory = Long.parseLong(usedMemoryStr);
-            long totalMemory = Long.parseLong(totalMemoryStr);
-
-            int percentage = (int) ((usedMemory * 100) / totalMemory);
-            return percentage + "%";
-        } catch (Exception e) {
-            return "Error calculating memory percentage";
+            long memoryBytes = Long.parseLong(memoryUsage);
+            long memoryMB = memoryBytes / (1024 * 1024); // Convert bytes to MB
+            return memoryMB + " MB";
+        } catch (NumberFormatException e) {
+            return memoryUsage; // Return the raw value if parsing fails
         }
     }
 }

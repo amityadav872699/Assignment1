@@ -1,98 +1,86 @@
-import org.snmp4j.*;
-import org.snmp4j.event.ResponseEvent;
-import org.snmp4j.mp.SnmpConstants;
-import org.snmp4j.smi.*;
-import org.snmp4j.transport.*;
-import java.io.IOException;
+import com.tailf.jnc.Device;
+import com.tailf.jnc.JNCException;
+import com.tailf.jnc.NetconfSession;
 
-public class SNMPClient {
-    private static final String SNMP_COMMUNITY = "public";
-    private static final String SNMP_HOST = "192.168.56.1";
-    private static final int SNMP_PORT = 161;
-    private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
-    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
-    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
-    private static final String OID_TOTAL_MEMORY = ".1.3.6.1.4.1.9.9.48.1.1.1.5.1";
-
+public class NetconfClient {
     public static void main(String[] args) {
+        String host = "172.20.0.85";
+        int port = 830;
+        String username = "admin";
+        String password = "admin";
+
+        NetconfSession session = null;
+
         try {
-            TransportMapping transport = new DefaultUdpTransportMapping();
-            Snmp snmp = new Snmp(transport);
-            snmp.listen();
+            Device device = new Device("Router", host, port, username, password);
+            session = device.getSession();
 
-            CommunityTarget target = new CommunityTarget();
-            target.setCommunity(new OctetString(SNMP_COMMUNITY));
-            target.setAddress(new UdpAddress(SNMP_HOST + "/" + SNMP_PORT));
-            target.setVersion(SnmpConstants.version2c);
-            target.setTimeout(5000);
-            target.setRetries(3);
+            System.out.println("Connected to NETCONF device.");
 
-            String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
-            String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
-            String totalMemory = getSNMPData(snmp, target, OID_TOTAL_MEMORY);
-            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE), totalMemory);
+            String getHostnameRequest = """
+                <rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"1\">
+                  <get>
+                    <filter>
+                      <system xmlns=\"http://example.com/network\">
+                        <hostname/>
+                      </system>
+                    </filter>
+                  </get>
+                </rpc>
+            ";
 
-            System.out.println("SNMP Device System Information:");
-            System.out.println("--------------------------------");
-            System.out.println("System Uptime: " + systemUptime);
-            System.out.println("CPU Usage: " + cpuUsage);
-            System.out.println("Memory Usage: " + memoryUsage);
+            String response = session.request(getHostnameRequest);
+            String currentHostname = parseHostname(response);
 
-            snmp.close();
-        } catch (IOException e) {
-            System.out.println("Error occurred: " + e.getMessage());
-        }
-    }
+            System.out.println("Current Hostname: " + currentHostname);
 
-    private static String getSNMPData(Snmp snmp, CommunityTarget target, String oid) {
-        try {
-            PDU pdu = new PDU();
-            pdu.add(new VariableBinding(new OID(oid)));
-            pdu.setType(PDU.GET);
+            String newHostname = "NewRouterName";
+            System.out.println("Changing Hostname to: " + newHostname);
 
-            ResponseEvent responseEvent = snmp.get(pdu, target);
+            String editConfigRequest = """
+                <rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"101\">
+                  <edit-config>
+                    <target>
+                      <running/>
+                    </target>
+                    <config>
+                      <system xmlns=\"http://example.com/network\">
+                        <hostname>" + newHostname + "</hostname>
+                      </system>
+                    </config>
+                  </edit-config>
+                </rpc>
+            ";
 
-            if (responseEvent != null) {
-                PDU responsePDU = responseEvent.getResponse();
-                if (responsePDU != null && responsePDU.getErrorStatus() == PDU.noError) {
-                    VariableBinding vb = responsePDU.get(0);
-                    return vb.getVariable().toString();
-                } else {
-                    return "Error: " + responsePDU.getErrorStatusText() + ", Error Index: " + responsePDU.getErrorIndex();
+            session.request(editConfigRequest);
+            System.out.println("Hostname changed successfully!");
+
+            response = session.request(getHostnameRequest);
+            String updatedHostname = parseHostname(response);
+
+            System.out.println("Updated Hostname: " + updatedHostname);
+
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (session != null) {
+                try {
+                    session.closeSession();
+                    System.out.println("Session closed.");
+                } catch (JNCException e) {
+                    System.err.println("Failed to close the session: " + e.getMessage());
                 }
-            } else {
-                return "Error: No response from the SNMP device";
             }
-        } catch (Exception e) {
-            return "Exception: " + e.getMessage();
         }
     }
 
-    private static String formatUptime(String uptime) {
-        try {
-            long hundredthsOfSeconds = Long.parseLong(uptime);
-            long seconds = hundredthsOfSeconds / 100;
-            long hours = seconds / 3600;
-            long minutes = (seconds % 3600) / 60;
-            return hours + " hours " + minutes + " minutes";
-        } catch (Exception e) {
-            return uptime;
+    private static String parseHostname(String response) {
+        int start = response.indexOf("<hostname>") + 10;
+        int end = response.indexOf("</hostname>");
+        if (start != -1 && end != -1) {
+            return response.substring(start, end);
         }
-    }
-
-    private static String formatMemory(String memoryUsage, String totalMemory) {
-        try {
-            long usedMemoryBytes = Long.parseLong(memoryUsage);
-            long totalMemoryBytes = Long.parseLong(totalMemory);
-
-            if (totalMemoryBytes == 0) {
-                return "Error: Total memory cannot be zero";
-            }
-
-            int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes);
-            return percentage + "%";
-        } catch (NumberFormatException e) {
-            return "Invalid memory data";
-        }
+        return "Unknown";
     }
 }

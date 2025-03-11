@@ -10,8 +10,9 @@ public class SNMPClient {
     private static final String SNMP_HOST = "192.168.56.1";
     private static final int SNMP_PORT = 161;
     private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
-    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.2021.11.9.0";
-    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.2021.4.11.0";
+    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
+    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
+    private static final String OID_TOTAL_MEMORY = ".1.3.6.1.4.1.9.9.48.1.1.1.5.1";
 
     public static void main(String[] args) {
         try {
@@ -28,7 +29,8 @@ public class SNMPClient {
 
             String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
             String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
-            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE));
+            String totalMemory = getSNMPData(snmp, target, OID_TOTAL_MEMORY);
+            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE), totalMemory);
 
             System.out.println("SNMP Device System Information:");
             System.out.println("--------------------------------");
@@ -68,29 +70,29 @@ public class SNMPClient {
 
     private static String formatUptime(String uptime) {
         try {
-            String[] parts = uptime.split(":");
-            int hours = Integer.parseInt(parts[0]);
-            int minutes = Integer.parseInt(parts[1]);
+            long hundredthsOfSeconds = Long.parseLong(uptime);
+            long seconds = hundredthsOfSeconds / 100;
+            long hours = seconds / 3600;
+            long minutes = (seconds % 3600) / 60;
             return hours + " hours " + minutes + " minutes";
         } catch (Exception e) {
-            return uptime; // Return the raw value if parsing fails
+            return uptime;
         }
     }
 
     private static String formatMemory(String memoryUsage, String totalMemory) {
-    try {
-        long usedMemoryBytes = Long.parseLong(memoryUsage);
-        long totalMemoryBytes = Long.parseLong(totalMemory);
-        
-        if (totalMemoryBytes == 0) {
-            return "Error: Total memory cannot be zero";
-        }
-        
-        int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes); // Calculate percentage
-        return percentage + "%";
-    } catch (NumberFormatException e) {
-        return "Invalid memory data"; // Handle parsing errors
-    }
-}
+        try {
+            long usedMemoryBytes = Long.parseLong(memoryUsage);
+            long totalMemoryBytes = Long.parseLong(totalMemory);
 
+            if (totalMemoryBytes == 0) {
+                return "Error: Total memory cannot be zero";
+            }
+
+            int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes);
+            return percentage + "%";
+        } catch (NumberFormatException e) {
+            return "Invalid memory data";
+        }
+    }
 }

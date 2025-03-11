@@ -3,39 +3,35 @@ import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
 import org.snmp4j.transport.*;
+import org.snmp4j.util.TreeUtils;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.List;
 
-public class SNMPClient {
-    private static final String SNMP_COMMUNITY = "public";
-    private static final String SNMP_HOST = "172.20.0.2";
-    private static final int SNMP_PORT = 161;
+public class SNMPClientExample {
 
-    private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
-    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
-    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
+    private static final String SNMP_COMMUNITY = "public"; // Default SNMP community string
+    private static final String SNMP_HOST = "192.168.56.1"; // SNMP device IP
+    private static final int SNMP_PORT = 161; // SNMP port (default 161)
+    private static final String OID_SYS_DESCR = ".1.3.6.1.2.1.1.1.0"; // Example OID for SNMP GET
 
     public static void main(String[] args) {
         try {
-            // Initialize SNMP request handler
+            // Step 1: Establish SNMP communication
             TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
             Snmp snmp = new Snmp(transport);
             snmp.listen();
 
-            // Create SNMP target
             CommunityTarget target = createTarget(SNMP_HOST, SNMP_PORT, SNMP_COMMUNITY);
 
-            // Perform SNMP GET for System Uptime, CPU Usage, and Memory Usage
-            Map<String, String> systemData = new HashMap<>();
-            systemData.put("System Uptime", parseUptime(getSNMPData(snmp, target, OID_SYS_UPTIME)));
-            systemData.put("CPU Usage", formatPercentage(getSNMPData(snmp, target, OID_CPU_USAGE)));
-            systemData.put("Memory Usage", formatPercentage(getSNMPData(snmp, target, OID_MEMORY_USAGE)));
+            // Step 2: Perform SNMP GET request
+            System.out.println("Performing SNMP GET Request:");
+            String sysDescr = snmpGet(snmp, target, OID_SYS_DESCR);
+            System.out.println("System Description: " + sysDescr);
 
-            // Display SNMP Device System Information in a structured format
-            System.out.println("SNMP Device System Information:");
-            System.out.println("--------------------------------");
-            systemData.forEach((key, value) -> System.out.println(key + ": " + value));
+            // Step 3: Perform SNMP WALK request
+            System.out.println("\nPerforming SNMP WALK Request:");
+            snmpWalk(snmp, target, ".1.3.6.1.2.1.1"); // Example base OID for system group
 
             // Close the SNMP session
             snmp.close();
@@ -44,64 +40,59 @@ public class SNMPClient {
         }
     }
 
-    // Create the SNMP target
     private static CommunityTarget createTarget(String host, int port, String community) {
         CommunityTarget target = new CommunityTarget();
         target.setCommunity(new OctetString(community));
         target.setAddress(new UdpAddress(host + "/" + port));
         target.setVersion(SnmpConstants.version2c);
         target.setTimeout(5000); // 5 seconds timeout
-        target.setRetries(3); // Retries count
+        target.setRetries(3); // Retry count
         return target;
     }
 
-    // Send SNMP GET request and retrieve the value
-    private static String getSNMPData(Snmp snmp, CommunityTarget target, String oid) {
+    private static String snmpGet(Snmp snmp, CommunityTarget target, String oid) {
         try {
-            // Prepare the GET request for the provided OID
             PDU pdu = new PDU();
             pdu.add(new VariableBinding(new OID(oid)));
             pdu.setType(PDU.GET);
 
-            // Perform the GET request and receive the response
             ResponseEvent responseEvent = snmp.get(pdu, target);
-
-            if (responseEvent != null) {
+            if (responseEvent != null && responseEvent.getResponse() != null) {
                 PDU responsePDU = responseEvent.getResponse();
-                if (responsePDU != null && responsePDU.getErrorStatus() == PDU.noError) {
-                    // Extract the result from the response
+                if (responsePDU.getErrorStatus() == PDU.noError) {
                     VariableBinding vb = responsePDU.get(0);
                     return vb.getVariable().toString();
                 } else {
                     return "Error: " + responsePDU.getErrorStatusText();
                 }
             } else {
-                return "Error: No response from the SNMP device";
+                return "Error: No response from the SNMP device.";
             }
         } catch (Exception e) {
             return "Exception: " + e.getMessage();
         }
     }
 
-    // Parse SNMP system uptime from raw hundredths of a second
-    private static String parseUptime(String rawUptime) {
+    private static void snmpWalk(Snmp snmp, CommunityTarget target, String baseOid) {
         try {
-            long hundredthsOfSeconds = Long.parseLong(rawUptime);
-            long totalSeconds = hundredthsOfSeconds / 100;
-            long hours = totalSeconds / 3600;
-            long minutes = (totalSeconds % 3600) / 60;
-            return hours + " hours " + minutes + " minutes";
-        } catch (NumberFormatException e) {
-            return "Invalid uptime format";
-        }
-    }
+            TreeUtils treeUtils = new TreeUtils(snmp, new DefaultPDUFactory());
+            List<TreeEvent> events = treeUtils.getSubtree(target, new OID(baseOid));
 
-    // Format CPU and memory usage as percentage
-    private static String formatPercentage(String rawValue) {
-        try {
-            return rawValue + "%";
-        } catch (NumberFormatException e) {
-            return "Invalid percentage format";
+            if (events == null || events.isEmpty()) {
+                System.out.println("No results returned for SNMP WALK.");
+                return;
+            }
+
+            for (TreeEvent event : events) {
+                if (event == null || event.getVariableBindings() == null) {
+                    continue;
+                }
+                for (VariableBinding vb : event.getVariableBindings()) {
+                    System.out.println(vb.getOid() + " = " + vb.getVariable());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error during SNMP WALK: " + e.getMessage());
         }
     }
 }

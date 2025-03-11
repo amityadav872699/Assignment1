@@ -1,86 +1,94 @@
-import com.tailf.jnc.Device;
-import com.tailf.jnc.JNCException;
-import com.tailf.jnc.NetconfSession;
+package com.netconf;
 
-public class NetconfClient {
-    public static void main(String[] args) {
-        String host = "172.20.0.85";
-        int port = 830;
-        String username = "admin";
-        String password = "admin";
+import com.tid.netconf.NetconfClient;
+import org.apache.sshd.client.auth.password.UserAuthPassword;
+import org.apache.sshd.client.session.ClientSession;
+import org.apache.sshd.client.SshClient;
 
-        NetconfSession session = null;
+import java.io.IOException;
 
-        try {
-            Device device = new Device("Router", host, port, username, password);
-            session = device.getSession();
+public class NetconfSession {
+    private final NetconfClient client;
+    private final ClientSession session;
+    private final SshClient sshClient;
 
-            System.out.println("Connected to NETCONF device.");
-
-            String getHostnameRequest = """
-                <rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"1\">
-                  <get>
-                    <filter>
-                      <system xmlns=\"http://example.com/network\">
-                        <hostname/>
-                      </system>
-                    </filter>
-                  </get>
-                </rpc>
-            ";
-
-            String response = session.request(getHostnameRequest);
-            String currentHostname = parseHostname(response);
-
-            System.out.println("Current Hostname: " + currentHostname);
-
-            String newHostname = "NewRouterName";
-            System.out.println("Changing Hostname to: " + newHostname);
-
-            String editConfigRequest = """
-                <rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"101\">
-                  <edit-config>
-                    <target>
-                      <running/>
-                    </target>
-                    <config>
-                      <system xmlns=\"http://example.com/network\">
-                        <hostname>" + newHostname + "</hostname>
-                      </system>
-                    </config>
-                  </edit-config>
-                </rpc>
-            ";
-
-            session.request(editConfigRequest);
-            System.out.println("Hostname changed successfully!");
-
-            response = session.request(getHostnameRequest);
-            String updatedHostname = parseHostname(response);
-
-            System.out.println("Updated Hostname: " + updatedHostname);
-
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            if (session != null) {
-                try {
-                    session.closeSession();
-                    System.out.println("Session closed.");
-                } catch (JNCException e) {
-                    System.err.println("Failed to close the session: " + e.getMessage());
-                }
-            }
-        }
+    public NetconfSession(String host, int port, String username, String password) throws IOException {
+        sshClient = SshClient.setUpDefaultClient();
+        sshClient.start();
+        session = sshClient.connect(username, host, port).verify().getSession();
+        session.addPasswordIdentity(password);
+        session.auth().verify();
+        client = new NetconfClient(session);
     }
 
-    private static String parseHostname(String response) {
-        int start = response.indexOf("<hostname>") + 10;
-        int end = response.indexOf("</hostname>");
-        if (start != -1 && end != -1) {
-            return response.substring(start, end);
+    public String sendRPC(String rpc) throws IOException {
+        return client.sendRpc(rpc);
+    }
+
+    public void close() throws IOException {
+        session.close();
+        sshClient.stop();
+    }
+}
+
+
+package com.netconf;
+
+import java.io.IOException;
+
+public class RetrieveConfig {
+    public static void main(String[] args) {
+        try {
+            NetconfSession netconf = new NetconfSession("192.168.1.1", 830, "admin", "password");
+
+            String getConfigRPC = 
+                "<rpc xmlns='urn:ietf:params:xml:ns:netconf:base:1.0'>" +
+                "<get>" +
+                "<filter type='subtree'>" +
+                "<interfaces xmlns='urn:ietf:params:xml:ns:yang:ietf-interfaces'/>" +
+                "</filter>" +
+                "</get>" +
+                "</rpc>";
+
+            String response = netconf.sendRPC(getConfigRPC);
+            System.out.println("Router Configuration: \n" + response);
+
+            netconf.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return "Unknown";
+    }
+}
+
+
+
+package com.netconf;
+
+import java.io.IOException;
+
+public class EditConfig {
+    public static void main(String[] args) {
+        try {
+            NetconfSession netconf = new NetconfSession("192.168.1.1", 830, "admin", "password");
+
+            String editConfigRPC = 
+                "<rpc xmlns='urn:ietf:params:xml:ns:netconf:base:1.0'>" +
+                "<edit-config>" +
+                "<target><running/></target>" +
+                "<config>" +
+                "<system xmlns='urn:ietf:params:xml:ns:yang:ietf-system'>" +
+                "<hostname>MyNewRouter</hostname>" +
+                "</system>" +
+                "</config>" +
+                "</edit-config>" +
+                "</rpc>";
+
+            String response = netconf.sendRPC(editConfigRPC);
+            System.out.println("Edit Config Response: \n" + response);
+
+            netconf.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

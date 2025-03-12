@@ -1,104 +1,102 @@
-<dependency>
-    <groupId>com.telit</groupId>
-    <artifactId>netconf4j</artifactId>
-    <version>1.0.6</version>
-    <scope>system</scope>
-    <systemPath>${project.basedir}/lib/netconf4j-1.0.6.jar</systemPath>
-</dependency>
-
-
-
-package com.netconf;
-
-import com.tid.netconf.NetconfClient;
-import org.apache.sshd.client.auth.password.UserAuthPassword;
-import org.apache.sshd.client.session.ClientSession;
-import org.apache.sshd.client.SshClient;
+import org.snmp4j.*;
+import org.snmp4j.event.ResponseEvent;
+import org.snmp4j.mp.SnmpConstants;
+import org.snmp4j.smi.*;
+import org.snmp4j.transport.*;
 
 import java.io.IOException;
 
-public class NetconfSession {
-    private final NetconfClient client;
-    private final ClientSession session;
-    private final SshClient sshClient;
+public class SNMPClient {
+    private static final String SNMP_COMMUNITY = "public";
+    private static final String SNMP_HOST = "172.20.0.83";
+    private static final int SNMP_PORT = 161;
 
-    public NetconfSession(String host, int port, String username, String password) throws IOException {
-        sshClient = SshClient.setUpDefaultClient();
-        sshClient.start();
-        session = sshClient.connect(username, host, port).verify().getSession();
-        session.addPasswordIdentity(password);
-        session.auth().verify();
-        client = new NetconfClient(session);
-    }
+    private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
+    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
+    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
+    private static final String OID_TOTAL_MEMORY = ".1.3.6.1.4.1.9.9.48.1.1.1.5.1";
 
-    public String sendRPC(String rpc) throws IOException {
-        return client.sendRpc(rpc);
-    }
-
-    public void close() throws IOException {
-        session.close();
-        sshClient.stop();
-    }
-}
-
-
-package com.netconf;
-
-import java.io.IOException;
-
-public class RetrieveConfig {
     public static void main(String[] args) {
         try {
-            NetconfSession netconf = new NetconfSession("192.168.1.1", 830, "admin", "password");
+            TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
+            Snmp snmp = new Snmp(transport);
+            snmp.listen();
 
-            String getConfigRPC = 
-                "<rpc xmlns='urn:ietf:params:xml:ns:netconf:base:1.0'>" +
-                "<get>" +
-                "<filter type='subtree'>" +
-                "<interfaces xmlns='urn:ietf:params:xml:ns:yang:ietf-interfaces'/>" +
-                "</filter>" +
-                "</get>" +
-                "</rpc>";
+            CommunityTarget target = new CommunityTarget();
+            target.setCommunity(new OctetString(SNMP_COMMUNITY));
+            target.setAddress(new UdpAddress(SNMP_HOST + "/" + SNMP_PORT));
+            target.setVersion(SnmpConstants.version2c);
+            target.setTimeout(5000);
+            target.setRetries(3);
 
-            String response = netconf.sendRPC(getConfigRPC);
-            System.out.println("Router Configuration: \n" + response);
+            // Fetch SNMP data
+            String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
+            String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
+            String totalMemory = getSNMPData(snmp, target, OID_TOTAL_MEMORY);
+            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE), totalMemory);
 
-            netconf.close();
+            // Display results
+            System.out.println("SNMP Device System Information:");
+            System.out.println("--------------------------------");
+            System.out.println("System Uptime: " + systemUptime);
+            System.out.println("CPU Usage: " + cpuUsage);
+            System.out.println("Memory Usage: " + memoryUsage);
+
+            snmp.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Error occurred: " + e.getMessage());
         }
     }
-}
 
-
-
-package com.netconf;
-
-import java.io.IOException;
-
-public class EditConfig {
-    public static void main(String[] args) {
+    private static String getSNMPData(Snmp snmp, CommunityTarget target, String oid) {
         try {
-            NetconfSession netconf = new NetconfSession("192.168.1.1", 830, "admin", "password");
+            PDU pdu = new PDU();
+            pdu.add(new VariableBinding(new OID(oid)));
+            pdu.setType(PDU.GET);
 
-            String editConfigRPC = 
-                "<rpc xmlns='urn:ietf:params:xml:ns:netconf:base:1.0'>" +
-                "<edit-config>" +
-                "<target><running/></target>" +
-                "<config>" +
-                "<system xmlns='urn:ietf:params:xml:ns:yang:ietf-system'>" +
-                "<hostname>MyNewRouter</hostname>" +
-                "</system>" +
-                "</config>" +
-                "</edit-config>" +
-                "</rpc>";
+            ResponseEvent responseEvent = snmp.get(pdu, target);
 
-            String response = netconf.sendRPC(editConfigRPC);
-            System.out.println("Edit Config Response: \n" + response);
+            if (responseEvent != null) {
+                PDU responsePDU = responseEvent.getResponse();
+                if (responsePDU != null && responsePDU.getErrorStatus() == PDU.noError) {
+                    VariableBinding vb = responsePDU.get(0);
+                    return vb.getVariable().toString();
+                } else {
+                    return "Error: " + (responsePDU != null ? responsePDU.getErrorStatusText() : "No response PDU");
+                }
+            } else {
+                return "Error: No response from the SNMP device";
+            }
+        } catch (Exception e) {
+            return "Exception: " + e.getMessage();
+        }
+    }
 
-            netconf.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+    private static String formatUptime(String uptime) {
+        try {
+            long hundredthsOfSeconds = Long.parseLong(uptime);
+            long totalSeconds = hundredthsOfSeconds / 100;
+            long hours = totalSeconds / 3600;
+            long minutes = (totalSeconds % 3600) / 60;
+            return hours + " hours " + minutes + " minutes";
+        } catch (NumberFormatException e) {
+            return "Invalid uptime data";
+        }
+    }
+
+    private static String formatMemory(String memoryUsage, String totalMemory) {
+        try {
+            long usedMemoryBytes = Long.parseLong(memoryUsage);
+            long totalMemoryBytes = Long.parseLong(totalMemory);
+
+            if (totalMemoryBytes == 0) {
+                return "Error: Total memory cannot be zero";
+            }
+
+            int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes);
+            return percentage + "%";
+        } catch (NumberFormatException e) {
+            return "Invalid memory data";
         }
     }
 }

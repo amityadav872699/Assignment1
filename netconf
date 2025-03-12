@@ -1,0 +1,232 @@
+1. Project Structure
+css
+Copy
+Edit
+netconf/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   ├── com/
+│   │   │   │   ├── yang/
+│   │   │   │   │   ├── config/
+│   │   │   │   │   │   ├── NetconfManager.java
+│   │   │   │   │   │   ├── NetconfSession.java
+│   │   │   │   │   ├── main/
+│   │   │   │   │   │   ├── Main.java
+│   │   ├── resources/
+│   │       └── log4j2.xml
+├── pom.xml
+2. pom.xml
+You already have the correct pom.xml. Ensure the following:
+
+xml
+Copy
+Edit
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.yang</groupId>
+  <artifactId>netconf</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>netconf</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <!-- OpenDaylight Yang Tools -->
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-parser-impl</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-model-api</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-data-impl</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-common</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <!-- Logging Dependencies -->
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
+3. Java Code
+NetconfSession.java
+Manages the SSH connection and handles NETCONF communication.
+
+java
+Copy
+Edit
+package com.yang.config;
+
+import java.io.*;
+import java.net.Socket;
+
+public class NetconfSession {
+    private Socket socket;
+    private BufferedReader reader;
+    private BufferedWriter writer;
+
+    public NetconfSession(String host, int port, String username, String password) throws IOException {
+        this.socket = new Socket(host, port); // Default NETCONF port is 830
+        this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+        // Send initial hello message for NETCONF handshake
+        sendCommand("<hello xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"></hello>");
+    }
+
+    public String sendRequest(String rpc) throws IOException {
+        writer.write(rpc + "\n]]>]]>\n");
+        writer.flush();
+
+        StringBuilder response = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line).append("\n");
+            if (line.contains("]]>]]>")) {
+                break;
+            }
+        }
+        return response.toString();
+    }
+
+    public void close() throws IOException {
+        writer.close();
+        reader.close();
+        socket.close();
+    }
+
+    private void sendCommand(String command) throws IOException {
+        writer.write(command + "\n");
+        writer.flush();
+    }
+}
+NetconfManager.java
+Handles configuration management tasks like retrieving and editing configurations.
+
+java
+Copy
+Edit
+package com.yang.config;
+
+import java.io.IOException;
+
+public class NetconfManager {
+    private NetconfSession session;
+
+    public NetconfManager(String host, int port, String username, String password) throws IOException {
+        this.session = new NetconfSession(host, port, username, password);
+    }
+
+    public String getConfiguration() throws IOException {
+        String getConfigRpc = "<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"1\">" +
+                              "<get><filter type=\"subtree\"><configuration/></filter></get></rpc>";
+        return session.sendRequest(getConfigRpc);
+    }
+
+    public void editConfiguration(String newConfig) throws IOException {
+        String editConfigRpc = "<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\" message-id=\"2\">" +
+                               "<edit-config><target><running/></target><config>" + newConfig + "</config></edit-config></rpc>";
+        session.sendRequest(editConfigRpc);
+    }
+
+    public void close() throws IOException {
+        session.close();
+    }
+}
+Main.java
+The entry point for the application.
+
+java
+Copy
+Edit
+package com.yang.main;
+
+import com.yang.config.NetconfManager;
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            System.out.print("Enter device IP: ");
+            String deviceIP = scanner.nextLine();
+
+            System.out.print("Enter username: ");
+            String username = scanner.nextLine();
+
+            System.out.print("Enter password: ");
+            String password = scanner.nextLine();
+
+            NetconfManager manager = new NetconfManager(deviceIP, 830, username, password);
+
+            System.out.println("Retrieving configuration...");
+            String config = manager.getConfiguration();
+            System.out.println("Current Configuration:\n" + config);
+
+            System.out.print("Do you want to edit the configuration? (yes/no): ");
+            if (scanner.nextLine().equalsIgnoreCase("yes")) {
+                System.out.print("Enter new configuration (XML format): ");
+                String newConfig = scanner.nextLine();
+                manager.editConfiguration(newConfig);
+                System.out.println("Configuration updated successfully.");
+            }
+
+            manager.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+4. Build Instructions
+Save the project structure as shown.
+Open a terminal and navigate to the project directory.
+Build the project using:
+bash
+Copy
+Edit
+mvn clean install
+Run the application:
+bash
+Copy
+Edit
+java -cp target/netconf-0.0.1-SNAPSHOT.jar com.yang.main.Main
+This setup should allow you to build and run the project. Let me know if you need further assistance!

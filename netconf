@@ -230,3 +230,251 @@ Copy
 Edit
 java -cp target/netconf-0.0.1-SNAPSHOT.jar com.yang.main.Main
 This setup should allow you to build and run the project. Let me know if you need further assistance!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+To resolve the java.net.SocketException: Connection reset error and properly configure your NETCONF-based Java application, follow these steps systematically:
+
+Step 1: Setup and Verify Your Environment
+Ensure Device Support for NETCONF
+
+Confirm that your network device supports NETCONF over SSH and it is properly configured. For example, on Cisco devices, enable NETCONF:
+bash
+Copy
+Edit
+configure terminal
+netconf ssh
+Check Connectivity
+
+Test the connection to the device using a tool like PuTTY or ssh from your terminal:
+bash
+Copy
+Edit
+ssh admin@172.20.0.85 -p 830
+Validate Your Credentials
+
+Ensure the username and password are correct. If authentication fails, the device may reset the connection.
+Firewall/ACL Configuration
+
+Ensure no firewall or Access Control List (ACL) is blocking communication on port 830.
+Step 2: Project Structure
+Here is the project structure for your NETCONF-based tool:
+
+css
+Copy
+Edit
+netconf-project
+├── src
+│   └── main
+│       └── java
+│           ├── com.yang.main
+│           │   └── Main.java
+│           ├── com.yang.config
+│           │   ├── NetconfManager.java
+│           │   └── NetconfSession.java
+│           └── com.yang.util
+│               └── LoggerUtil.java
+└── pom.xml
+Step 3: pom.xml
+Ensure the pom.xml is configured with the necessary dependencies for OpenDaylight YANG tools and Log4j:
+
+xml
+Copy
+Edit
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.yang</groupId>
+  <artifactId>netconf</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>netconf</name>
+
+  <dependencies>
+    <!-- OpenDaylight Yang Tools -->
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-parser-impl</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-model-api</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <!-- Logging Dependencies -->
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+  </dependencies>
+</project>
+Step 4: Java Code
+1. NetconfSession.java
+Manages the NETCONF session with the device.
+
+java
+Copy
+Edit
+package com.yang.config;
+
+import java.io.*;
+import java.net.Socket;
+
+public class NetconfSession {
+    private Socket socket;
+    private BufferedWriter writer;
+    private BufferedReader reader;
+
+    public NetconfSession(String host, int port, String username, String password) throws IOException {
+        try {
+            this.socket = new Socket(host, port);
+            this.writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            // NETCONF Hello Message
+            String hello = "<hello xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n" +
+                           "  <capabilities>\n" +
+                           "    <capability>urn:ietf:params:netconf:base:1.0</capability>\n" +
+                           "  </capabilities>\n" +
+                           "</hello>\n]]>]]>";
+            sendCommand(hello);
+        } catch (IOException e) {
+            throw new IOException("Error connecting to NETCONF server: " + e.getMessage(), e);
+        }
+    }
+
+    public String sendCommand(String command) throws IOException {
+        writer.write(command + "\n]]>]]>\n");
+        writer.flush();
+
+        StringBuilder response = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line).append("\n");
+            if (line.contains("]]>]]>")) {
+                break;
+            }
+        }
+        return response.toString();
+    }
+
+    public void close() throws IOException {
+        if (socket != null) {
+            socket.close();
+        }
+    }
+}
+2. NetconfManager.java
+Handles the high-level management of NETCONF operations.
+
+java
+Copy
+Edit
+package com.yang.config;
+
+import java.io.IOException;
+
+public class NetconfManager {
+    private NetconfSession session;
+
+    public NetconfManager(String host, int port, String username, String password) throws IOException {
+        this.session = new NetconfSession(host, port, username, password);
+    }
+
+    public String getConfiguration() throws IOException {
+        String rpc = "<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n" +
+                     "  <get>\n" +
+                     "    <filter type=\"subtree\">\n" +
+                     "      <configuration/>\n" +
+                     "    </filter>\n" +
+                     "  </get>\n" +
+                     "</rpc>";
+        return session.sendCommand(rpc);
+    }
+
+    public void close() throws IOException {
+        session.close();
+    }
+}
+3. Main.java
+The entry point of the application.
+
+java
+Copy
+Edit
+package com.yang.main;
+
+import com.yang.config.NetconfManager;
+
+import java.io.IOException;
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("Enter device IP:");
+        String deviceIP = scanner.nextLine();
+        System.out.println("Enter username:");
+        String username = scanner.nextLine();
+        System.out.println("Enter password:");
+        String password = scanner.nextLine();
+
+        try {
+            NetconfManager manager = new NetconfManager(deviceIP, 830, username, password);
+            System.out.println("Retrieving configuration...");
+            String config = manager.getConfiguration();
+            System.out.println("Configuration:\n" + config);
+            manager.close();
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+}
+Step 5: Steps to Run
+Build the project:
+
+bash
+Copy
+Edit
+mvn clean install
+Run the application:
+
+bash
+Copy
+Edit
+java -cp target/netconf-0.0.1-SNAPSHOT.jar com.yang.main.Main
+Provide the IP, username, and password when prompted.
+
+Next Steps for Debugging
+If you still encounter issues:
+
+Verify connectivity using an external NETCONF client.
+Check device logs to diagnose the reason for connection resets.

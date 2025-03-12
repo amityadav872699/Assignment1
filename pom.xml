@@ -209,6 +209,122 @@ public class CLI {
         }
     }
 }
+
+//logging
+package com.automation.logging;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class LoggerUtil {
+    private static final String LOG_FILE = "netconf_tool.log";
+
+    public static void log(String message) {
+        try (FileWriter writer = new FileWriter(LOG_FILE, true)) {
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            writer.write("[" + timestamp + "] " + message + "\n");
+        } catch (IOException e) {
+            System.err.println("Error writing to log file: " + e.getMessage());
+        }
+    }
+
+    public static void logError(String errorMessage) {
+        log("ERROR: " + errorMessage);
+    }
+}
+
+
+//MAIN
+package com.automation.main;
+
+import com.automation.authentication.UserAuth;
+import com.automation.config.NetconfManager;
+import com.automation.config.ConfigBackup;
+import com.automation.config.ConfigRestore;
+import com.automation.discovery.DeviceDiscovery;
+import com.automation.logging.LoggerUtil;
+
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        LoggerUtil.log("NETCONF Automation Tool started.");
+
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            System.out.println("Welcome to NETCONF Automation Tool");
+            System.out.print("Enter username: ");
+            String username = scanner.nextLine();
+            System.out.print("Enter password: ");
+            String password = scanner.nextLine();
+
+            if (!UserAuth.authenticate(username, password)) {
+                LoggerUtil.logError("Authentication failed for user: " + username);
+                System.out.println("Authentication failed! Please check your credentials.");
+                return;
+            }
+            LoggerUtil.log("User " + username + " authenticated successfully.");
+
+            System.out.print("Enter device IP: ");
+            String deviceIP = scanner.nextLine();
+
+            if (!DeviceDiscovery.isDeviceReachable(deviceIP)) {
+                LoggerUtil.logError("Device unreachable: " + deviceIP);
+                System.out.println("Device is not reachable. Please check the IP and network connectivity.");
+                return;
+            }
+            LoggerUtil.log("Device " + deviceIP + " is reachable.");
+
+            NetconfManager manager = new NetconfManager(deviceIP, username, password);
+
+            System.out.println("Retrieving current configuration...");
+            String config = manager.getConfiguration();
+            LoggerUtil.log("Retrieved configuration from device: " + deviceIP);
+
+            System.out.println("Current Configuration:");
+            System.out.println(config);
+
+            System.out.println("Do you want to back up the current configuration? (yes/no)");
+            if (scanner.nextLine().equalsIgnoreCase("yes")) {
+                ConfigBackup.backup(config, "backup_" + deviceIP + ".xml");
+                LoggerUtil.log("Configuration backed up for device: " + deviceIP);
+                System.out.println("Configuration backed up successfully.");
+            }
+
+            System.out.println("Do you want to edit the configuration? (yes/no)");
+            if (scanner.nextLine().equalsIgnoreCase("yes")) {
+                System.out.print("Enter new configuration (XML format): ");
+                String newConfig = scanner.nextLine();
+
+                manager.editConfiguration(newConfig);
+                LoggerUtil.log("Configuration edited for device: " + deviceIP);
+                System.out.println("Configuration updated successfully.");
+            }
+
+            System.out.println("Do you want to restore a configuration? (yes/no)");
+            if (scanner.nextLine().equalsIgnoreCase("yes")) {
+                System.out.print("Enter path to the backup file: ");
+                String backupPath = scanner.nextLine();
+                String restoredConfig = ConfigRestore.restore(backupPath);
+                manager.editConfiguration(restoredConfig);
+                LoggerUtil.log("Configuration restored for device: " + deviceIP);
+                System.out.println("Configuration restored successfully.");
+            }
+
+            manager.close();
+            LoggerUtil.log("Session with device " + deviceIP + " closed.");
+        } catch (Exception e) {
+            LoggerUtil.logError("Exception occurred: " + e.getMessage());
+            System.err.println("An error occurred: " + e.getMessage());
+        } finally {
+            LoggerUtil.log("NETCONF Automation Tool exited.");
+        }
+    }
+}
+
 3. pom.xml
 xml
 Copy

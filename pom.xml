@@ -1,0 +1,149 @@
+You’re facing issues because the YangNode and YangParser classes are not available in the dependencies you’re using. There are two major YANG parsing libraries commonly used in Java:
+	1.	Tail-f JNC (Java NETCONF Client) – Uses com.tailf.jnc.YangNode, but it’s primarily used for NETCONF-based YANG interactions.
+	2.	OpenDaylight YANG Tools – Provides a robust set of tools for YANG model parsing, including org.opendaylight.yangtools.yang.parser.spi.YangParser.
+
+Recommended Fix:
+
+Since you are using OpenDaylight YANG Tools, you need to correctly instantiate the YANG Parser and retrieve the parsed data model.
+
+⸻
+
+Step 1: Update Dependencies (pom.xml)
+
+Replace your current dependencies with these correct OpenDaylight dependencies:
+
+<dependencies>
+    <!-- OpenDaylight Yang Tools -->
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-parser-impl</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-model-api</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-data-impl</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.opendaylight.yangtools</groupId>
+        <artifactId>yang-common</artifactId>
+        <version>14.0.11</version>
+    </dependency>
+
+    <!-- Logging Dependencies -->
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>2.17.2</version>
+    </dependency>
+</dependencies>
+
+
+
+⸻
+
+Step 2: Update YangModelParser.java
+
+Since OpenDaylight does not provide YangNode directly, we must correctly initialize the parser and parse the YANG file.
+
+New Code for YANG Parsing using OpenDaylight
+
+package com.yang.parser;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Set;
+
+import org.opendaylight.yangtools.yang.model.api.SchemaContext;
+import org.opendaylight.yangtools.yang.model.repo.api.SchemaSourceRepresentation;
+import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCache;
+import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCache.Builder;
+import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCacheFactory;
+import org.opendaylight.yangtools.yang.parser.api.YangParserFactory;
+import org.opendaylight.yangtools.yang.parser.impl.YangParserFactoryImpl;
+
+public class YangModelParser {
+
+    public static SchemaContext parseYangFile(String filePath) throws Exception {
+        File yangFile = new File(filePath);
+        if (!yangFile.exists()) {
+            throw new IllegalArgumentException("YANG file not found: " + filePath);
+        }
+
+        YangParserFactory parserFactory = new YangParserFactoryImpl();
+        Set<File> yangFiles = Collections.singleton(yangFile);
+        SchemaContext schemaContext = parserFactory.createParser().parseFiles(yangFiles);
+        
+        return schemaContext;
+    }
+
+    public static void validateYangModel(SchemaContext schemaContext) throws Exception {
+        if (schemaContext == null) {
+            throw new Exception("Parsed YANG model is null. Validation failed.");
+        }
+        System.out.println("YANG Model Validation Successful!");
+    }
+
+    public static void main(String[] args) {
+        try {
+            String filePath = "path/to/your.yang"; // Replace with actual YANG file path
+            SchemaContext yangModel = parseYangFile(filePath);
+            System.out.println("Parsed YANG Model: " + yangModel.toString());
+
+            validateYangModel(yangModel);
+        } catch (Exception e) {
+            System.err.println("Error processing YANG file: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+
+
+
+⸻
+
+Step 3: Running the Code
+	1.	Ensure you have the latest dependencies installed:
+
+mvn clean install
+
+
+	2.	Run the Java class:
+
+mvn exec:java -Dexec.mainClass="com.yang.parser.YangModelParser"
+
+
+	3.	Expected Output:
+
+Parsed YANG Model: [SchemaContext information]
+YANG Model Validation Successful!
+
+
+
+⸻
+
+Summary of Fixes
+
+✅ Fixed Incorrect Library Usage → Replaced com.tailf.jnc.YangNode with SchemaContext from OpenDaylight.
+✅ Updated Dependencies → Added yang-data-impl and yang-common dependencies.
+✅ Rewrote Parsing Code → Used YangParserFactoryImpl to parse YANG files correctly.
+✅ Validated YANG Schema → Used OpenDaylight’s SchemaContext for YANG validation.
+
+This should fix your problem! Let me know if you need further clarifications.

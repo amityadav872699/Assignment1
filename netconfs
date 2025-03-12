@@ -220,3 +220,158 @@ Copy
 Edit
 java -cp target/netconf-0.0.1-SNAPSHOT.jar com.yang.main.Main
 This implementation fully meets the requirements, including logging, backup/restore, and secure credential handling.
+
+
+
+
+
+
+
+
+
+// Main.java
+package com.yang.main;
+
+import com.yang.config.NetconfManager;
+import com.yang.config.DeviceDiscovery;
+import com.yang.config.BackupManager;
+import com.yang.security.KeyStoreManager;
+
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            System.out.println("Enter device IP:");
+            String deviceIP = scanner.nextLine();
+            System.out.println("Enter username:");
+            String username = scanner.nextLine();
+            System.out.println("Enter password:");
+            String password = scanner.nextLine();
+
+            KeyStoreManager.storeCredential(username, password);
+
+            if (DeviceDiscovery.isDeviceAccessible(deviceIP, username, password)) {
+                System.out.println("Device is accessible. Connecting via NETCONF...");
+
+                NetconfManager manager = new NetconfManager(deviceIP, 830, username, password);
+                BackupManager backupManager = new BackupManager();
+
+                // Retrieve and display configuration
+                String config = manager.getConfiguration();
+                System.out.println("Current Configuration: \n" + config);
+
+                // Backup configuration
+                backupManager.backupConfiguration(deviceIP, config);
+
+                // Modify configuration (example)
+                String newConfig = "<config>\n  <hostname>UpdatedDevice</hostname>\n</config>";
+                manager.editConfiguration(newConfig);
+                System.out.println("Configuration updated successfully.");
+
+                // Restore backup (example)
+                String backupConfig = backupManager.getBackup(deviceIP);
+                manager.editConfiguration(backupConfig);
+                System.out.println("Configuration restored successfully.");
+
+                manager.close();
+            } else {
+                System.out.println("Device is not accessible.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+}
+
+// NetconfManager.java
+package com.yang.config;
+
+import org.opendaylight.netconf.api.NetconfSession;
+import org.opendaylight.netconf.api.NetconfSessionListener;
+import org.opendaylight.netconf.client.NetconfClientDispatcher;
+import org.opendaylight.netconf.client.NetconfClientSession;
+import org.opendaylight.netconf.client.NetconfClientSessionListener;
+import org.opendaylight.netconf.client.NetconfClientDispatcherImpl;
+
+import java.util.concurrent.Executors;
+
+public class NetconfManager {
+    private NetconfClientSession session;
+
+    public NetconfManager(String host, int port, String username, String password) throws Exception {
+        NetconfClientDispatcher dispatcher = new NetconfClientDispatcherImpl(Executors.newSingleThreadExecutor());
+        this.session = dispatcher.createSession(username, password, host, port).get();
+    }
+
+    public String getConfiguration() throws Exception {
+        String request = "<get><filter><configuration/></filter></get>";
+        return session.sendRequest(request);
+    }
+
+    public void editConfiguration(String newConfig) throws Exception {
+        String request = "<edit-config><target><running/></target><config>" + newConfig + "</config></edit-config>";
+        session.sendRequest(request);
+    }
+
+    public void close() throws Exception {
+        session.close();
+    }
+}
+
+// DeviceDiscovery.java
+package com.yang.config;
+
+import java.io.IOException;
+import java.net.InetAddress;
+
+public class DeviceDiscovery {
+    public static boolean isDeviceAccessible(String ip, String username, String password) {
+        try {
+            InetAddress address = InetAddress.getByName(ip);
+            return address.isReachable(5000);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+}
+
+// BackupManager.java
+package com.yang.config;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class BackupManager {
+    private final Map<String, String> backups = new HashMap<>();
+
+    public void backupConfiguration(String deviceIP, String config) {
+        backups.put(deviceIP, config);
+    }
+
+    public String getBackup(String deviceIP) {
+        return backups.get(deviceIP);
+    }
+}
+
+// KeyStoreManager.java
+package com.yang.security;
+
+import java.io.FileOutputStream;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+
+public class KeyStoreManager {
+    public static void storeCredential(String username, String password) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("JCEKS");
+        keyStore.load(null, password.toCharArray());
+        
+        try (FileOutputStream fos = new FileOutputStream("keystore.jks")) {
+            keyStore.store(fos, password.toCharArray());
+        }
+    }
+}
+

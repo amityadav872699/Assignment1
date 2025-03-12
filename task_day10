@@ -304,3 +304,43 @@ public class NetworkManagementApp {
         telemetry.start();
     }
 }
+
+
+
+//NETCONFClient.java
+package netconf;
+
+import net.juniper.netconf.NetconfSession;
+
+public class NETCONFClient {
+    private NetconfSession session;
+
+    public NETCONFClient(String host, String username, String password) throws Exception {
+        // Initialize NetconfSession with host, port, username, and password
+        this.session = new NetconfSession(host, 830, username, password);
+    }
+
+    public void configureRouter(String newHostname) throws Exception {
+        try {
+            // Retrieve current configuration
+            String getConfig = this.session.getConfig("running");
+            System.out.println("Current Configuration: " + getConfig);
+
+            // Create the edit-config payload
+            String editConfig = "<config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
+                    + "<system>"
+                    + "<hostname>" + newHostname + "</hostname>"
+                    + "</system>"
+                    + "</config>";
+            this.session.editConfig(editConfig);
+
+            // Verify the updated configuration
+            String verifyConfig = this.session.getConfig("running");
+            System.out.println("Updated Configuration: " + verifyConfig);
+        } catch (Exception e) {
+            System.out.println("Error configuring router: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+

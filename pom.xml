@@ -1,3 +1,293 @@
+This project involves creating a NETCONF-based network automation tool to configure multiple network devices. Here's a detailed breakdown:
+
+1. Project Structure
+netconf-automation-tool/
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── automation/
+│   │   │           ├── authentication/
+│   │   │           │   ├── UserAuth.java
+│   │   │           │   └── KeyStoreUtil.java
+│   │   │           ├── config/
+│   │   │           │   ├── NetconfManager.java
+│   │   │           │   ├── ConfigBackup.java
+│   │   │           │   └── ConfigRestore.java
+│   │   │           ├── discovery/
+│   │   │           │   └── DeviceDiscovery.java
+│   │   │           ├── ui/
+│   │   │           │   └── CLI.java
+│   │   │           ├── logging/
+│   │   │           │   └── LoggerUtil.java
+│   │   │           └── main/
+│   │   │               └── Main.java
+│   └── resources/
+│       └── keystore/
+│           └── credentials.jks
+│
+├── pom.xml
+└── README.md
+2. Java Code
+User Authentication
+UserAuth.java
+
+package com.automation.authentication;
+
+import java.security.KeyStore;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import java.util.Scanner;
+
+public class UserAuth {
+    public static boolean authenticate(String username, String password) {
+        // Replace this with actual KeyStore-based validation
+        return username.equals("admin") && password.equals("password");
+    }
+}
+KeyStoreUtil.java
+
+package com.automation.authentication;
+
+import java.io.FileInputStream;
+import java.security.KeyStore;
+
+public class KeyStoreUtil {
+    public static KeyStore loadKeyStore(String filePath, String password) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("JCEKS");
+        FileInputStream fis = new FileInputStream(filePath);
+        keyStore.load(fis, password.toCharArray());
+        fis.close();
+        return keyStore;
+    }
+}
+Device Discovery
+DeviceDiscovery.java
+
+java
+Copy
+Edit
+package com.automation.discovery;
+
+import java.io.IOException;
+
+public class DeviceDiscovery {
+    public static boolean isDeviceReachable(String ipAddress) {
+        try {
+            Process p = Runtime.getRuntime().exec("ping -c 1 " + ipAddress);
+            return p.waitFor() == 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+}
+NETCONF Configuration Management
+NetconfManager.java
+
+java
+Copy
+Edit
+package com.automation.config;
+
+import com.tailf.jnc.*;
+
+public class NetconfManager {
+    private Device device;
+
+    public NetconfManager(String host, String username, String password) throws IOException, JNCException {
+        device = new Device("router", host, "juniper", username, password, 830);
+        device.connect();
+    }
+
+    public String getConfiguration() throws JNCException {
+        return device.getConfig(Device.RUNNING).toXMLString();
+    }
+
+    public void editConfiguration(String config) throws JNCException {
+        device.editConfig(Device.RUNNING, config);
+    }
+
+    public void close() throws IOException {
+        device.close();
+    }
+}
+Backup & Restore
+ConfigBackup.java
+
+java
+Copy
+Edit
+package com.automation.config;
+
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class ConfigBackup {
+    public static void backup(String config, String filePath) throws IOException {
+        FileWriter writer = new FileWriter(filePath);
+        writer.write(config);
+        writer.close();
+    }
+}
+ConfigRestore.java
+
+java
+Copy
+Edit
+package com.automation.config;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.BufferedReader;
+
+public class ConfigRestore {
+    public static String restore(String filePath) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(filePath));
+        StringBuilder config = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            config.append(line).append("\n");
+        }
+        reader.close();
+        return config.toString();
+    }
+}
+CLI
+CLI.java
+
+java
+Copy
+Edit
+package com.automation.ui;
+
+import com.automation.authentication.UserAuth;
+import com.automation.config.NetconfManager;
+import com.automation.config.ConfigBackup;
+import com.automation.config.ConfigRestore;
+
+import java.util.Scanner;
+
+public class CLI {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("Welcome to NETCONF Automation Tool");
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine();
+        System.out.print("Enter password: ");
+        String password = scanner.nextLine();
+
+        if (!UserAuth.authenticate(username, password)) {
+            System.out.println("Authentication failed!");
+            return;
+        }
+
+        try {
+            System.out.print("Enter device IP: ");
+            String deviceIP = scanner.nextLine();
+            NetconfManager manager = new NetconfManager(deviceIP, username, password);
+
+            String config = manager.getConfiguration();
+            System.out.println("Current Configuration: ");
+            System.out.println(config);
+
+            System.out.println("Do you want to edit config? (yes/no)");
+            if (scanner.nextLine().equalsIgnoreCase("yes")) {
+                System.out.print("Enter new configuration: ");
+                String newConfig = scanner.nextLine();
+                manager.editConfiguration(newConfig);
+
+                ConfigBackup.backup(config, "backup.xml");
+                System.out.println("Configuration backed up!");
+            }
+
+            manager.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+3. pom.xml
+xml
+Copy
+Edit
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.automation</groupId>
+    <artifactId>netconf-automation-tool</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>com.tail-f</groupId>
+            <artifactId>netconf4j</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+    </dependencies>
+</project>
+4. Network Topology
+Topology Diagram
+Router 1: 192.168.1.1
+Router 2: 192.168.1.2
+Switch 1: 192.168.1.3
+All devices are connected through an Ethernet LAN.
+
+5. Device Configuration
+Enable SSH and NETCONF on devices.
+Assign IP addresses as mentioned in the topology.
+Use YANG models for configuration validation.
+This implementation should cover all major objectives of the project.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 You’re facing issues because the YangNode and YangParser classes are not available in the dependencies you’re using. There are two major YANG parsing libraries commonly used in Java:
 	1.	Tail-f JNC (Java NETCONF Client) – Uses com.tailf.jnc.YangNode, but it’s primarily used for NETCONF-based YANG interactions.
 	2.	OpenDaylight YANG Tools – Provides a robust set of tools for YANG model parsing, including org.opendaylight.yangtools.yang.parser.spi.YangParser.

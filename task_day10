@@ -1,102 +1,235 @@
+Project Structure:
+
+NetworkManagementApp
+|-- src
+|   |-- main
+|       |-- java
+|           |-- snmp
+|               |-- SNMPClient.java
+|           |-- netconf
+|               |-- NETCONFClient.java
+|           |-- restconf
+|               |-- RESTCONFClient.java
+|           |-- telemetry
+|               |-- TelemetryCollector.java
+|           |-- app
+|               |-- NetworkManagementApp.java
+|-- pom.xml
+
+--- Topology ---
+
+Network Topology:
+
+[ SNMP-Enabled Device (192.168.1.1) ]
+          |
+          |-- SNMPClient
+
+[ NETCONF-Enabled Router (192.168.1.2) ]
+          |
+          |-- NETCONFClient
+
+[ RESTCONF Server (192.168.1.3) ]
+          |
+          |-- RESTCONFClient
+
+[ Prometheus PushGateway (localhost:9091) ]
+          |
+          |-- TelemetryCollector
+
+--- Code Implementation ---
+
+// SNMPClient.java
+package snmp;
+
 import org.snmp4j.*;
-import org.snmp4j.event.ResponseEvent;
-import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
+import org.snmp4j.mp.*;
 import org.snmp4j.transport.*;
 
-import java.io.IOException;
-
 public class SNMPClient {
-    private static final String SNMP_COMMUNITY = "public";
-    private static final String SNMP_HOST = "172.20.0.83";
-    private static final int SNMP_PORT = 161;
+    private String address;
+    private Snmp snmp;
 
-    private static final String OID_SYS_UPTIME = ".1.3.6.1.2.1.1.3.0";
-    private static final String OID_CPU_USAGE = ".1.3.6.1.4.1.9.2.1.58.0";
-    private static final String OID_MEMORY_USAGE = ".1.3.6.1.4.1.9.9.48.1.1.1.6.1";
-    private static final String OID_TOTAL_MEMORY = ".1.3.6.1.4.1.9.9.48.1.1.1.5.1";
-
-    public static void main(String[] args) {
-        try {
-            TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
-            Snmp snmp = new Snmp(transport);
-            snmp.listen();
-
-            CommunityTarget target = new CommunityTarget();
-            target.setCommunity(new OctetString(SNMP_COMMUNITY));
-            target.setAddress(new UdpAddress(SNMP_HOST + "/" + SNMP_PORT));
-            target.setVersion(SnmpConstants.version2c);
-            target.setTimeout(5000);
-            target.setRetries(3);
-
-            // Fetch SNMP data
-            String systemUptime = formatUptime(getSNMPData(snmp, target, OID_SYS_UPTIME));
-            String cpuUsage = getSNMPData(snmp, target, OID_CPU_USAGE) + "%";
-            String totalMemory = getSNMPData(snmp, target, OID_TOTAL_MEMORY);
-            String memoryUsage = formatMemory(getSNMPData(snmp, target, OID_MEMORY_USAGE), totalMemory);
-
-            // Display results
-            System.out.println("SNMP Device System Information:");
-            System.out.println("--------------------------------");
-            System.out.println("System Uptime: " + systemUptime);
-            System.out.println("CPU Usage: " + cpuUsage);
-            System.out.println("Memory Usage: " + memoryUsage);
-
-            snmp.close();
-        } catch (IOException e) {
-            System.out.println("Error occurred: " + e.getMessage());
-        }
+    public SNMPClient(String address) throws Exception {
+        this.address = address;
+        TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
+        this.snmp = new Snmp(transport);
+        transport.listen();
     }
 
-    private static String getSNMPData(Snmp snmp, CommunityTarget target, String oid) {
-        try {
+    public void getSystemInfo() throws Exception {
+        CommunityTarget target = new CommunityTarget();
+        target.setCommunity(new OctetString("public"));
+        target.setAddress(new UdpAddress(this.address + "/161"));
+        target.setRetries(2);
+        target.setTimeout(1500);
+        target.setVersion(SnmpConstants.version2c);
+
+        String[] oids = {
+            "1.3.6.1.2.1.1.3.0", // Uptime
+            "1.3.6.1.4.1.2021.11.9.0", // CPU Usage
+            "1.3.6.1.4.1.2021.4.6.0" // Memory Usage
+        };
+
+        for (String oid : oids) {
             PDU pdu = new PDU();
             pdu.add(new VariableBinding(new OID(oid)));
             pdu.setType(PDU.GET);
 
-            ResponseEvent responseEvent = snmp.get(pdu, target);
+            ResponseEvent responseEvent = this.snmp.send(pdu, target);
+            PDU response = responseEvent.getResponse();
 
-            if (responseEvent != null) {
-                PDU responsePDU = responseEvent.getResponse();
-                if (responsePDU != null && responsePDU.getErrorStatus() == PDU.noError) {
-                    VariableBinding vb = responsePDU.get(0);
-                    return vb.getVariable().toString();
-                } else {
-                    return "Error: " + (responsePDU != null ? responsePDU.getErrorStatusText() : "No response PDU");
-                }
+            if (response != null) {
+                System.out.println(response.get(0).getVariable().toString());
             } else {
-                return "Error: No response from the SNMP device";
+                System.out.println("Failed to retrieve OID: " + oid);
             }
+        }
+    }
+}
+
+// NETCONFClient.java
+package netconf;
+
+import net.juniper.netconf.NetconfSession;
+
+public class NETCONFClient {
+    private NetconfSession session;
+
+    public NETCONFClient(String host, String username, String password) throws Exception {
+        this.session = new NetconfSession(host, username, password);
+    }
+
+    public void configureRouter(String newHostname) throws Exception {
+        String getConfig = this.session.getConfig("running");
+        System.out.println("Current Hostname: " + getConfig);
+
+        String editConfig = "<config><system><hostname>" + newHostname + "</hostname></system></config>";
+        this.session.editConfig(editConfig);
+
+        String verifyConfig = this.session.getConfig("running");
+        System.out.println("Updated Hostname: " + verifyConfig);
+    }
+}
+
+// RESTCONFClient.java
+package restconf;
+
+import java.net.http.*;
+import java.net.URI;
+
+public class RESTCONFClient {
+    private HttpClient client;
+    private String baseUri;
+
+    public RESTCONFClient(String baseUri) {
+        this.client = HttpClient.newHttpClient();
+        this.baseUri = baseUri;
+    }
+
+    public void manageVLAN(String vlanId, String action) throws Exception {
+        String uri = this.baseUri + "/vlan/" + vlanId;
+        HttpRequest request = null;
+
+        switch (action.toUpperCase()) {
+            case "ADD":
+                request = HttpRequest.newBuilder()
+                        .uri(URI.create(uri))
+                        .PUT(HttpRequest.BodyPublishers.ofString("{"vlanId": " + vlanId + "}"))
+                        .build();
+                break;
+            case "DELETE":
+                request = HttpRequest.newBuilder()
+                        .uri(URI.create(uri))
+                        .DELETE()
+                        .build();
+                break;
+        }
+
+        HttpResponse<String> response = this.client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Response: " + response.body());
+    }
+}
+
+// TelemetryCollector.java
+package telemetry;
+
+import java.util.Timer;
+import java.util.TimerTask;
+import java.net.http.*;
+import java.net.URI;
+
+public class TelemetryCollector {
+    private Timer timer;
+
+    public TelemetryCollector() {
+        this.timer = new Timer();
+    }
+
+    public void start() {
+        this.timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                collectMetrics();
+            }
+        }, 0, 5000);
+    }
+
+    private void collectMetrics() {
+        double latency = Math.random() * 100; // Simulated latency
+        double bandwidth = Math.random() * 1000; // Simulated bandwidth
+
+        System.out.println("Latency: " + latency + "ms, Bandwidth: " + bandwidth + "Mbps");
+        pushMetrics(latency, bandwidth);
+    }
+
+    private void pushMetrics(double latency, double bandwidth) {
+        try {
+            String data = "# HELP network_latency_ms Network latency in milliseconds\n" +
+                          "# TYPE network_latency_ms gauge\n" +
+                          "network_latency_ms " + latency + "\n" +
+                          "# HELP network_bandwidth_mbps Network bandwidth usage in Mbps\n" +
+                          "# TYPE network_bandwidth_mbps gauge\n" +
+                          "network_bandwidth_mbps " + bandwidth;
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:9091/metrics/job/network"))
+                    .POST(HttpRequest.BodyPublishers.ofString(data))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("Metrics pushed: " + response.body());
         } catch (Exception e) {
-            return "Exception: " + e.getMessage();
+            System.out.println("Failed to push metrics: " + e.getMessage());
         }
     }
+}
 
-    private static String formatUptime(String uptime) {
-        try {
-            long hundredthsOfSeconds = Long.parseLong(uptime);
-            long totalSeconds = hundredthsOfSeconds / 100;
-            long hours = totalSeconds / 3600;
-            long minutes = (totalSeconds % 3600) / 60;
-            return hours + " hours " + minutes + " minutes";
-        } catch (NumberFormatException e) {
-            return "Invalid uptime data";
-        }
-    }
+// NetworkManagementApp.java
+package app;
 
-    private static String formatMemory(String memoryUsage, String totalMemory) {
-        try {
-            long usedMemoryBytes = Long.parseLong(memoryUsage.trim());
-            long totalMemoryBytes = Long.parseLong(totalMemory.trim());
+import snmp.SNMPClient;
+import netconf.NETCONFClient;
+import restconf.RESTCONFClient;
+import telemetry.TelemetryCollector;
 
-            if (totalMemoryBytes <= 0) {
-                return "Error: Total memory cannot be zero or negative";
-            }
+public class NetworkManagementApp {
+    public static void main(String[] args) throws Exception {
+        // SNMP Example
+        SNMPClient snmpClient = new SNMPClient("192.168.1.1");
+        snmpClient.getSystemInfo();
 
-            double percentage = (double) usedMemoryBytes / totalMemoryBytes * 100;
-            return String.format("%.2f%%", percentage); // Format to two decimal places
-        } catch (NumberFormatException e) {
-            return "Invalid memory data";
-        }
+        // NETCONF Example
+        NETCONFClient netconfClient = new NETCONFClient("192.168.1.2", "admin", "password");
+        netconfClient.configureRouter("NewRouterName");
+
+        // RESTCONF Example
+        RESTCONFClient restconfClient = new RESTCONFClient("http://192.168.1.3:8080/restconf");
+        restconfClient.manageVLAN("100", "ADD");
+
+        // Prometheus Telemetry Example
+        TelemetryCollector telemetry = new TelemetryCollector();
+        telemetry.start();
     }
 }

@@ -86,15 +86,15 @@ public class SNMPClient {
 
     private static String formatMemory(String memoryUsage, String totalMemory) {
         try {
-            long usedMemoryBytes = Long.parseLong(memoryUsage);
-            long totalMemoryBytes = Long.parseLong(totalMemory);
+            long usedMemoryBytes = Long.parseLong(memoryUsage.trim());
+            long totalMemoryBytes = Long.parseLong(totalMemory.trim());
 
-            if (totalMemoryBytes == 0) {
-                return "Error: Total memory cannot be zero";
+            if (totalMemoryBytes <= 0) {
+                return "Error: Total memory cannot be zero or negative";
             }
 
-            int percentage = (int) ((usedMemoryBytes * 100) / totalMemoryBytes);
-            return percentage + "%";
+            double percentage = (double) usedMemoryBytes / totalMemoryBytes * 100;
+            return String.format("%.2f%%", percentage); // Format to two decimal places
         } catch (NumberFormatException e) {
             return "Invalid memory data";
         }

@@ -1,468 +1,184 @@
-Here is your updated pom.xml file with the requested dependencies and the necessary OpenDaylight repository configuration. You can copy this and replace your existing pom.xml to execute it as it is.
+Updated DeviceController.java
+java
+Copy
+Edit
+package com.example.nms.controller;
 
-Updated pom.xml
+import java.util.List;
+import java.util.stream.Collectors;
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  
-  <modelVersion>4.0.0</modelVersion>
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-  <groupId>com.yang</groupId>
-  <artifactId>netconf</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+import com.example.nms.inventory.entity.Device;
+import com.example.nms.serviceimpl.InventoryService;
 
-  <name>netconf</name>
-  <url>http://maven.apache.org</url>
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController {
 
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
+    @Autowired
+    private InventoryService inventoryService;
 
-  <dependencies>
-
-    <!-- OpenDaylight NETCONF Dependencies -->
-    <dependency>
-        <groupId>org.opendaylight.netconf</groupId>
-        <artifactId>netconf-client</artifactId>
-        <version>8.0.3</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.netconf</groupId>
-        <artifactId>netconf-api</artifactId>
-        <version>8.0.3</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.netconf</groupId>
-        <artifactId>transport-ssh</artifactId>
-        <version>7.0.3</version>
-    </dependency>
-
-    <!-- Logging Dependencies -->
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-core</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-    
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-api</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-
-    <!-- Java KeyStore Handling -->
-    <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcpkix-jdk15on</artifactId>
-        <version>1.70</version>
-    </dependency>
-
-  </dependencies>
-
-  <repositories>
-    <repository>
-        <id>opendaylight</id>
-        <name>OpenDaylight Nexus Repository</name>
-        <url>https://nexus.opendaylight.org/content/repositories/public/</url>
-    </repository>
-  </repositories>
-
-</project>
-
-
-
-⸻
-
-Steps to Apply This Update
-	1.	Replace your existing pom.xml with this version.
-	2.	Open a terminal or command prompt in your project’s root directory.
-	3.	Run the following command to update and install dependencies:
-
-mvn clean install
-
-
-	4.	If you are using an IDE like Eclipse, right-click the project → Maven → Update Project (Alt + F5).
-
-⸻
-
-What This Update Includes
-	•	Added OpenDaylight NETCONF dependencies:
-	•	netconf-client (8.0.3)
-	•	netconf-api (8.0.3)
-	•	transport-ssh (7.0.3)
-	•	Retained logging dependencies (log4j-core, log4j-api).
-	•	Included Java KeyStore handling (bcpkix-jdk15on).
-	•	Added OpenDaylight Maven repository to ensure proper resolution of dependencies.
-
-This should now work as expected! Let me know if you need any further modifications.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Project Structure:
-
-NetworkManagementApp
-|-- src
-|   |-- main
-|       |-- java
-|           |-- snmp
-|               |-- SNMPClient.java
-|           |-- netconf
-|               |-- NETCONFClient.java
-|           |-- restconf
-|               |-- RESTCONFClient.java
-|           |-- telemetry
-|               |-- TelemetryCollector.java
-|           |-- app
-|               |-- NetworkManagementApp.java
-|-- pom.xml
-
---- Topology ---
-
-Network Topology:
-
-[ SNMP-Enabled Device (192.168.1.1) ]
-          |
-          |-- SNMPClient
-
-[ NETCONF-Enabled Router (192.168.1.2) ]
-          |
-          |-- NETCONFClient
-
-[ RESTCONF Server (192.168.1.3) ]
-          |
-          |-- RESTCONFClient
-
-[ Prometheus PushGateway (localhost:9091) ]
-          |
-          |-- TelemetryCollector
-
---- Code Implementation ---
-// Pom.xml
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <groupId>com.network.management</groupId>
-    <artifactId>NetworkManagementApp</artifactId>
-    <version>1.0-SNAPSHOT</version>
-
-    <dependencies>
-
-        <dependency>
-             <groupId>com.tail-f</groupId>
-             <artifactId>netconf</artifactId>
-             <version>2.5.0</version> <!-- Replace with the version you're using -->
-        </dependency>
-
-        <!-- SNMP4J Dependency -->
-        <dependency>
-            <groupId>org.snmp4j</groupId>
-            <artifactId>snmp4j</artifactId>
-            <version>3.6.4</version>
-        </dependency>
-
-        <!-- NETCONF4J Dependency -->
-        <dependency>
-            <groupId>com.github.netconf4j</groupId>
-            <artifactId>netconf4j</artifactId>
-            <version>0.7.0</version>
-        </dependency>
-
-        <!-- Jackson for JSON Parsing -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.15.2</version>
-        </dependency>
-
-        <!-- Java HTTP Client is built into Java 11+, no additional dependency needed -->
-        
-        <!-- SLF4J for Logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-        
-        <!-- JUnit for Testing -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
-    <build>
-        <plugins>
-            <!-- Compiler Plugin -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.10.1</version>
-                <configuration>
-                    <source>11</source>
-                    <target>11</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-
-
-// SNMPClient.java
-package snmp;
-
-import org.snmp4j.*;
-import org.snmp4j.smi.*;
-import org.snmp4j.mp.*;
-import org.snmp4j.transport.*;
-
-public class SNMPClient {
-    private String address;
-    private Snmp snmp;
-
-    public SNMPClient(String address) throws Exception {
-        this.address = address;
-        TransportMapping<UdpAddress> transport = new DefaultUdpTransportMapping();
-        this.snmp = new Snmp(transport);
-        transport.listen();
+    @GetMapping("/get")
+    public List<Device> viewAllDevices() {
+        return inventoryService.viewAllDevices();
     }
 
-    public void getSystemInfo() throws Exception {
-        CommunityTarget target = new CommunityTarget();
-        target.setCommunity(new OctetString("public"));
-        target.setAddress(new UdpAddress(this.address + "/161"));
-        target.setRetries(2);
-        target.setTimeout(1500);
-        target.setVersion(SnmpConstants.version2c);
+    @PostMapping("/add")
+    public Device addDevice(@RequestBody Device device) {
+        return inventoryService.addDevice(device);
+    }
 
-        String[] oids = {
-            "1.3.6.1.2.1.1.3.0", // Uptime
-            "1.3.6.1.4.1.2021.11.9.0", // CPU Usage
-            "1.3.6.1.4.1.2021.4.6.0" // Memory Usage
-        };
+    @GetMapping("/{id}")
+    public ResponseEntity<Device> getDeviceById(@PathVariable long id) {
+        return inventoryService.viewDeviceById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
-        for (String oid : oids) {
-            PDU pdu = new PDU();
-            pdu.add(new VariableBinding(new OID(oid)));
-            pdu.setType(PDU.GET);
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Device> updateDevice(@PathVariable long id, @RequestBody Device updatedDevice) {
+        return inventoryService.viewDeviceById(id)
+                .map(device -> {
+                    device.setType(updatedDevice.getType());
+                    device.setIpAddress(updatedDevice.getIpAddress());
+                    device.setVendor(updatedDevice.getVendor());
+                    device.setStatus(updatedDevice.getStatus());
+                    return ResponseEntity.ok(inventoryService.addDevice(device));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 
-            ResponseEvent responseEvent = this.snmp.send(pdu, target);
-            PDU response = responseEvent.getResponse();
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deleteDevice(@PathVariable long id) {
+        inventoryService.deleteDevice(id);
+        return ResponseEntity.ok("Device deleted successfully");
+    }
 
-            if (response != null) {
-                System.out.println(response.get(0).getVariable().toString());
-            } else {
-                System.out.println("Failed to retrieve OID: " + oid);
-            }
-        }
+    @GetMapping("/connected")
+    public List<Device> getConnectedDevices() {
+        return inventoryService.viewAllConnectedDevices();
+    }
+
+    @GetMapping("/filter")
+    public List<Device> filterDevices(@RequestParam String status) {
+        return inventoryService.viewAllDevices().stream()
+                .filter(device -> status.equalsIgnoreCase(device.getStatus()))
+                .collect(Collectors.toList());
     }
 }
+Updated InventoryService Interface
+java
+Copy
+Edit
+package com.example.nms.serviceimpl;
 
-// NETCONFClient.java
-package netconf;
+import java.util.List;
+import java.util.Optional;
 
-import net.juniper.netconf.NetconfSession;
+import com.example.nms.inventory.entity.Device;
 
-public class NETCONFClient {
-    private NetconfSession session;
+public interface InventoryService {
 
-    public NETCONFClient(String host, String username, String password) throws Exception {
-        this.session = new NetconfSession(host, username, password);
-    }
+    Device addDevice(Device device);
 
-    public void configureRouter(String newHostname) throws Exception {
-        String getConfig = this.session.getConfig("running");
-        System.out.println("Current Hostname: " + getConfig);
+    Optional<Device> viewDeviceById(long id);
 
-        String editConfig = "<config><system><hostname>" + newHostname + "</hostname></system></config>";
-        this.session.editConfig(editConfig);
+    List<Device> viewAllDevices();
 
-        String verifyConfig = this.session.getConfig("running");
-        System.out.println("Updated Hostname: " + verifyConfig);
-    }
+    List<Device> viewAllConnectedDevices();
+
+    void deleteDevice(Long id); // New method
+
+    List<Device> filterDevices(String status); // Optional for future extensions
 }
+Updated InventoryServiceImpl.java
+java
+Copy
+Edit
+package com.example.nms.serviceimpl;
 
-// RESTCONFClient.java
-package restconf;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
-import java.net.http.*;
-import java.net.URI;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-public class RESTCONFClient {
-    private HttpClient client;
-    private String baseUri;
+import com.example.nms.discovery.SnmpDiscovery;
+import com.example.nms.inventory.entity.Device;
+import com.example.nms.inventory.repository.DeviceRepository;
 
-    public RESTCONFClient(String baseUri) {
-        this.client = HttpClient.newHttpClient();
-        this.baseUri = baseUri;
+@Service
+public class InventoryServiceImpl implements InventoryService {
+
+    @Autowired
+    private DeviceRepository deviceRepo;
+
+    @Autowired
+    private SnmpDiscovery snmpDiscovery;
+
+    @Override
+    public Device addDevice(Device device) {
+        return deviceRepo.save(device);
     }
 
-    public void manageVLAN(String vlanId, String action) throws Exception {
-        String uri = this.baseUri + "/vlan/" + vlanId;
-        HttpRequest request = null;
-
-        switch (action.toUpperCase()) {
-            case "ADD":
-                request = HttpRequest.newBuilder()
-                        .uri(URI.create(uri))
-                        .PUT(HttpRequest.BodyPublishers.ofString("{"vlanId": " + vlanId + "}"))
-                        .build();
-                break;
-            case "DELETE":
-                request = HttpRequest.newBuilder()
-                        .uri(URI.create(uri))
-                        .DELETE()
-                        .build();
-                break;
-        }
-
-        HttpResponse<String> response = this.client.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("Response: " + response.body());
-    }
-}
-
-// TelemetryCollector.java
-package telemetry;
-
-import java.util.Timer;
-import java.util.TimerTask;
-import java.net.http.*;
-import java.net.URI;
-
-public class TelemetryCollector {
-    private Timer timer;
-
-    public TelemetryCollector() {
-        this.timer = new Timer();
+    @Override
+    public List<Device> viewAllDevices() {
+        return deviceRepo.findAll();
     }
 
-    public void start() {
-        this.timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                collectMetrics();
-            }
-        }, 0, 5000);
+    @Override
+    public Optional<Device> viewDeviceById(long id) {
+        return deviceRepo.findById(id);
     }
 
-    private void collectMetrics() {
-        double latency = Math.random() * 100; // Simulated latency
-        double bandwidth = Math.random() * 1000; // Simulated bandwidth
-
-        System.out.println("Latency: " + latency + "ms, Bandwidth: " + bandwidth + "Mbps");
-        pushMetrics(latency, bandwidth);
-    }
-
-    private void pushMetrics(double latency, double bandwidth) {
+    @Override
+    public List<Device> viewAllConnectedDevices() {
+        List<Device> connectedDevices = new ArrayList<>();
         try {
-            String data = "# HELP network_latency_ms Network latency in milliseconds\n" +
-                          "# TYPE network_latency_ms gauge\n" +
-                          "network_latency_ms " + latency + "\n" +
-                          "# HELP network_bandwidth_mbps Network bandwidth usage in Mbps\n" +
-                          "# TYPE network_bandwidth_mbps gauge\n" +
-                          "network_bandwidth_mbps " + bandwidth;
-
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:9091/metrics/job/network"))
-                    .POST(HttpRequest.BodyPublishers.ofString(data))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            System.out.println("Metrics pushed: " + response.body());
+            List<String> connectedIpAddresses = snmpDiscovery.getConnectedDevices();
+            connectedDevices = deviceRepo.findAll().stream()
+                    .filter(device -> connectedIpAddresses.contains(device.getIpAddress()))
+                    .collect(Collectors.toList());
         } catch (Exception e) {
-            System.out.println("Failed to push metrics: " + e.getMessage());
-        }
-    }
-}
-
-// NetworkManagementApp.java
-package app;
-
-import snmp.SNMPClient;
-import netconf.NETCONFClient;
-import restconf.RESTCONFClient;
-import telemetry.TelemetryCollector;
-
-public class NetworkManagementApp {
-    public static void main(String[] args) throws Exception {
-        // SNMP Example
-        SNMPClient snmpClient = new SNMPClient("192.168.1.1");
-        snmpClient.getSystemInfo();
-
-        // NETCONF Example
-        NETCONFClient netconfClient = new NETCONFClient("192.168.1.2", "admin", "password");
-        netconfClient.configureRouter("NewRouterName");
-
-        // RESTCONF Example
-        RESTCONFClient restconfClient = new RESTCONFClient("http://192.168.1.3:8080/restconf");
-        restconfClient.manageVLAN("100", "ADD");
-
-        // Prometheus Telemetry Example
-        TelemetryCollector telemetry = new TelemetryCollector();
-        telemetry.start();
-    }
-}
-
-
-
-//NETCONFClient.java
-package netconf;
-
-import net.juniper.netconf.NetconfSession;
-
-public class NETCONFClient {
-    private NetconfSession session;
-
-    public NETCONFClient(String host, String username, String password) throws Exception {
-        // Initialize NetconfSession with host, port, username, and password
-        this.session = new NetconfSession(host, 830, username, password);
-    }
-
-    public void configureRouter(String newHostname) throws Exception {
-        try {
-            // Retrieve current configuration
-            String getConfig = this.session.getConfig("running");
-            System.out.println("Current Configuration: " + getConfig);
-
-            // Create the edit-config payload
-            String editConfig = "<config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">"
-                    + "<system>"
-                    + "<hostname>" + newHostname + "</hostname>"
-                    + "</system>"
-                    + "</config>";
-            this.session.editConfig(editConfig);
-
-            // Verify the updated configuration
-            String verifyConfig = this.session.getConfig("running");
-            System.out.println("Updated Configuration: " + verifyConfig);
-        } catch (Exception e) {
-            System.out.println("Error configuring router: " + e.getMessage());
             e.printStackTrace();
         }
+        return connectedDevices;
+    }
+
+    @Override
+    public void deleteDevice(Long id) {
+        deviceRepo.deleteById(id);
+    }
+
+    @Override
+    public List<Device> filterDevices(String status) {
+        return deviceRepo.findAll().stream()
+                .filter(device -> status.equalsIgnoreCase(device.getStatus()))
+                .collect(Collectors.toList());
     }
 }
+API Endpoints
+Get All Devices
+GET /api/devices/get
 
+Get Device by ID
+GET /api/devices/{id}
+
+Add a New Device
+POST /api/devices/add
+
+Update a Device
+PUT /api/devices/update/{id}
+
+Delete a Device
+DELETE /api/devices/delete/{id}
+
+Get All Connected Devices
+GET /api/devices/connected
+
+Filter Devices by Status
+GET /api/devices/filter?status=<status>

@@ -1,622 +1,317 @@
-This project involves creating a NETCONF-based network automation tool to configure multiple network devices. Here's a detailed breakdown:
-
-1. Project Structure
-netconf-automation-tool/
-│
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── automation/
-│   │   │           ├── authentication/
-│   │   │           │   ├── UserAuth.java
-│   │   │           │   └── KeyStoreUtil.java
-│   │   │           ├── config/
-│   │   │           │   ├── NetconfManager.java
-│   │   │           │   ├── ConfigBackup.java
-│   │   │           │   └── ConfigRestore.java
-│   │   │           ├── discovery/
-│   │   │           │   └── DeviceDiscovery.java
-│   │   │           ├── ui/
-│   │   │           │   └── CLI.java
-│   │   │           ├── logging/
-│   │   │           │   └── LoggerUtil.java
-│   │   │           └── main/
-│   │   │               └── Main.java
-│   └── resources/
-│       └── keystore/
-│           └── credentials.jks
-│
-├── pom.xml
-└── README.md
-2. Java Code
-User Authentication
-UserAuth.java
-
-package com.automation.authentication;
-
-import java.security.KeyStore;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import java.util.Scanner;
-
-public class UserAuth {
-    public static boolean authenticate(String username, String password) {
-        // Replace this with actual KeyStore-based validation
-        return username.equals("admin") && password.equals("password");
-    }
-}
-KeyStoreUtil.java
-
-package com.automation.authentication;
-
-import java.io.FileInputStream;
-import java.security.KeyStore;
-
-public class KeyStoreUtil {
-    public static KeyStore loadKeyStore(String filePath, String password) throws Exception {
-        KeyStore keyStore = KeyStore.getInstance("JCEKS");
-        FileInputStream fis = new FileInputStream(filePath);
-        keyStore.load(fis, password.toCharArray());
-        fis.close();
-        return keyStore;
-    }
-}
-Device Discovery
-DeviceDiscovery.java
-
+1. WiproApplication.java
 java
 Copy
 Edit
-package com.automation.discovery;
+package com.example.nms;
 
-import java.io.IOException;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-public class DeviceDiscovery {
-    public static boolean isDeviceReachable(String ipAddress) {
-        try {
-            Process p = Runtime.getRuntime().exec("ping -c 1 " + ipAddress);
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-}
-NETCONF Configuration Management
-NetconfManager.java
-
-java
-Copy
-Edit
-package com.automation.config;
-
-import com.tailf.jnc.*;
-
-public class NetconfManager {
-    private Device device;
-
-    public NetconfManager(String host, String username, String password) throws IOException, JNCException {
-        device = new Device("router", host, "juniper", username, password, 830);
-        device.connect();
-    }
-
-    public String getConfiguration() throws JNCException {
-        return device.getConfig(Device.RUNNING).toXMLString();
-    }
-
-    public void editConfiguration(String config) throws JNCException {
-        device.editConfig(Device.RUNNING, config);
-    }
-
-    public void close() throws IOException {
-        device.close();
-    }
-}
-Backup & Restore
-ConfigBackup.java
-
-java
-Copy
-Edit
-package com.automation.config;
-
-import java.io.FileWriter;
-import java.io.IOException;
-
-public class ConfigBackup {
-    public static void backup(String config, String filePath) throws IOException {
-        FileWriter writer = new FileWriter(filePath);
-        writer.write(config);
-        writer.close();
-    }
-}
-ConfigRestore.java
-
-java
-Copy
-Edit
-package com.automation.config;
-
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.BufferedReader;
-
-public class ConfigRestore {
-    public static String restore(String filePath) throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(filePath));
-        StringBuilder config = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            config.append(line).append("\n");
-        }
-        reader.close();
-        return config.toString();
-    }
-}
-CLI
-CLI.java
-
-java
-Copy
-Edit
-package com.automation.ui;
-
-import com.automation.authentication.UserAuth;
-import com.automation.config.NetconfManager;
-import com.automation.config.ConfigBackup;
-import com.automation.config.ConfigRestore;
-
-import java.util.Scanner;
-
-public class CLI {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-
-        System.out.println("Welcome to NETCONF Automation Tool");
-        System.out.print("Enter username: ");
-        String username = scanner.nextLine();
-        System.out.print("Enter password: ");
-        String password = scanner.nextLine();
-
-        if (!UserAuth.authenticate(username, password)) {
-            System.out.println("Authentication failed!");
-            return;
-        }
-
-        try {
-            System.out.print("Enter device IP: ");
-            String deviceIP = scanner.nextLine();
-            NetconfManager manager = new NetconfManager(deviceIP, username, password);
-
-            String config = manager.getConfiguration();
-            System.out.println("Current Configuration: ");
-            System.out.println(config);
-
-            System.out.println("Do you want to edit config? (yes/no)");
-            if (scanner.nextLine().equalsIgnoreCase("yes")) {
-                System.out.print("Enter new configuration: ");
-                String newConfig = scanner.nextLine();
-                manager.editConfiguration(newConfig);
-
-                ConfigBackup.backup(config, "backup.xml");
-                System.out.println("Configuration backed up!");
-            }
-
-            manager.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
-
-//logging
-package com.automation.logging;
-
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
-public class LoggerUtil {
-    private static final String LOG_FILE = "netconf_tool.log";
-
-    public static void log(String message) {
-        try (FileWriter writer = new FileWriter(LOG_FILE, true)) {
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            writer.write("[" + timestamp + "] " + message + "\n");
-        } catch (IOException e) {
-            System.err.println("Error writing to log file: " + e.getMessage());
-        }
-    }
-
-    public static void logError(String errorMessage) {
-        log("ERROR: " + errorMessage);
-    }
-}
-
-
-//MAIN
-package com.automation.main;
-
-import com.automation.authentication.UserAuth;
-import com.automation.config.NetconfManager;
-import com.automation.config.ConfigBackup;
-import com.automation.config.ConfigRestore;
-import com.automation.discovery.DeviceDiscovery;
-import com.automation.logging.LoggerUtil;
-
-import java.util.Scanner;
-
-public class Main {
-    public static void main(String[] args) {
-        LoggerUtil.log("NETCONF Automation Tool started.");
-
-        Scanner scanner = new Scanner(System.in);
-
-        try {
-            System.out.println("Welcome to NETCONF Automation Tool");
-            System.out.print("Enter username: ");
-            String username = scanner.nextLine();
-            System.out.print("Enter password: ");
-            String password = scanner.nextLine();
-
-            if (!UserAuth.authenticate(username, password)) {
-                LoggerUtil.logError("Authentication failed for user: " + username);
-                System.out.println("Authentication failed! Please check your credentials.");
-                return;
-            }
-            LoggerUtil.log("User " + username + " authenticated successfully.");
-
-            System.out.print("Enter device IP: ");
-            String deviceIP = scanner.nextLine();
-
-            if (!DeviceDiscovery.isDeviceReachable(deviceIP)) {
-                LoggerUtil.logError("Device unreachable: " + deviceIP);
-                System.out.println("Device is not reachable. Please check the IP and network connectivity.");
-                return;
-            }
-            LoggerUtil.log("Device " + deviceIP + " is reachable.");
-
-            NetconfManager manager = new NetconfManager(deviceIP, username, password);
-
-            System.out.println("Retrieving current configuration...");
-            String config = manager.getConfiguration();
-            LoggerUtil.log("Retrieved configuration from device: " + deviceIP);
-
-            System.out.println("Current Configuration:");
-            System.out.println(config);
-
-            System.out.println("Do you want to back up the current configuration? (yes/no)");
-            if (scanner.nextLine().equalsIgnoreCase("yes")) {
-                ConfigBackup.backup(config, "backup_" + deviceIP + ".xml");
-                LoggerUtil.log("Configuration backed up for device: " + deviceIP);
-                System.out.println("Configuration backed up successfully.");
-            }
-
-            System.out.println("Do you want to edit the configuration? (yes/no)");
-            if (scanner.nextLine().equalsIgnoreCase("yes")) {
-                System.out.print("Enter new configuration (XML format): ");
-                String newConfig = scanner.nextLine();
-
-                manager.editConfiguration(newConfig);
-                LoggerUtil.log("Configuration edited for device: " + deviceIP);
-                System.out.println("Configuration updated successfully.");
-            }
-
-            System.out.println("Do you want to restore a configuration? (yes/no)");
-            if (scanner.nextLine().equalsIgnoreCase("yes")) {
-                System.out.print("Enter path to the backup file: ");
-                String backupPath = scanner.nextLine();
-                String restoredConfig = ConfigRestore.restore(backupPath);
-                manager.editConfiguration(restoredConfig);
-                LoggerUtil.log("Configuration restored for device: " + deviceIP);
-                System.out.println("Configuration restored successfully.");
-            }
-
-            manager.close();
-            LoggerUtil.log("Session with device " + deviceIP + " closed.");
-        } catch (Exception e) {
-            LoggerUtil.logError("Exception occurred: " + e.getMessage());
-            System.err.println("An error occurred: " + e.getMessage());
-        } finally {
-            LoggerUtil.log("NETCONF Automation Tool exited.");
-        }
-    }
-}
-
-3. pom.xml
-xml
-Copy
-Edit
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.automation</groupId>
-    <artifactId>netconf-automation-tool</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <dependencies>
-        <dependency>
-            <groupId>com.tail-f</groupId>
-            <artifactId>netconf4j</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-    </dependencies>
-</project>
-4. Network Topology
-Topology Diagram
-Router 1: 192.168.1.1
-Router 2: 192.168.1.2
-Switch 1: 192.168.1.3
-All devices are connected through an Ethernet LAN.
-
-5. Device Configuration
-Enable SSH and NETCONF on devices.
-Assign IP addresses as mentioned in the topology.
-Use YANG models for configuration validation.
-This implementation should cover all major objectives of the project.
-
-
-//pom.xml
-
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-
-  <groupId>com.yang</groupId>
-  <artifactId>netconf</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
-
-  <name>netconf</name>
-  <url>http://maven.apache.org</url>
-
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-
-  <dependencies>
-	  
-	  
-
-    <!-- OpenDaylight Yang Tools -->
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-parser-impl</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-model-api</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-data-impl</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-common</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <!-- Logging Dependencies -->
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-core</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-api</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-</dependencies>
-
-</project>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-You’re facing issues because the YangNode and YangParser classes are not available in the dependencies you’re using. There are two major YANG parsing libraries commonly used in Java:
-	1.	Tail-f JNC (Java NETCONF Client) – Uses com.tailf.jnc.YangNode, but it’s primarily used for NETCONF-based YANG interactions.
-	2.	OpenDaylight YANG Tools – Provides a robust set of tools for YANG model parsing, including org.opendaylight.yangtools.yang.parser.spi.YangParser.
-
-Recommended Fix:
-
-Since you are using OpenDaylight YANG Tools, you need to correctly instantiate the YANG Parser and retrieve the parsed data model.
-
-⸻
-
-Step 1: Update Dependencies (pom.xml)
-
-Replace your current dependencies with these correct OpenDaylight dependencies:
-
-<dependencies>
-    <!-- OpenDaylight Yang Tools -->
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-parser-impl</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-model-api</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-data-impl</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.opendaylight.yangtools</groupId>
-        <artifactId>yang-common</artifactId>
-        <version>14.0.11</version>
-    </dependency>
-
-    <!-- Logging Dependencies -->
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-core</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-api</artifactId>
-        <version>2.17.2</version>
-    </dependency>
-</dependencies>
-
-
-
-⸻
-
-Step 2: Update YangModelParser.java
-
-Since OpenDaylight does not provide YangNode directly, we must correctly initialize the parser and parse the YANG file.
-
-New Code for YANG Parsing using OpenDaylight
-
-package com.yang.parser;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Set;
-
-import org.opendaylight.yangtools.yang.model.api.SchemaContext;
-import org.opendaylight.yangtools.yang.model.repo.api.SchemaSourceRepresentation;
-import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCache;
-import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCache.Builder;
-import org.opendaylight.yangtools.yang.model.repo.fs.FileSystemSchemaSourceCacheFactory;
-import org.opendaylight.yangtools.yang.parser.api.YangParserFactory;
-import org.opendaylight.yangtools.yang.parser.impl.YangParserFactoryImpl;
-
-public class YangModelParser {
-
-    public static SchemaContext parseYangFile(String filePath) throws Exception {
-        File yangFile = new File(filePath);
-        if (!yangFile.exists()) {
-            throw new IllegalArgumentException("YANG file not found: " + filePath);
-        }
-
-        YangParserFactory parserFactory = new YangParserFactoryImpl();
-        Set<File> yangFiles = Collections.singleton(yangFile);
-        SchemaContext schemaContext = parserFactory.createParser().parseFiles(yangFiles);
-        
-        return schemaContext;
-    }
-
-    public static void validateYangModel(SchemaContext schemaContext) throws Exception {
-        if (schemaContext == null) {
-            throw new Exception("Parsed YANG model is null. Validation failed.");
-        }
-        System.out.println("YANG Model Validation Successful!");
-    }
+@SpringBootApplication
+public class WiproApplication {
 
     public static void main(String[] args) {
-        try {
-            String filePath = "path/to/your.yang"; // Replace with actual YANG file path
-            SchemaContext yangModel = parseYangFile(filePath);
-            System.out.println("Parsed YANG Model: " + yangModel.toString());
-
-            validateYangModel(yangModel);
-        } catch (Exception e) {
-            System.err.println("Error processing YANG file: " + e.getMessage());
-            e.printStackTrace();
-        }
+        SpringApplication.run(WiproApplication.class, args);
+        System.out.println("Application started successfully!");
     }
 }
+2. DeviceController.java
+java
+Copy
+Edit
+package com.example.nms.controller;
 
+import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-⸻
+import com.example.nms.inventory.entity.Device;
+import com.example.nms.serviceimpl.InventoryService;
 
-Step 3: Running the Code
-	1.	Ensure you have the latest dependencies installed:
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController {
 
-mvn clean install
+    @Autowired
+    private InventoryService inventoryService;
 
+    @GetMapping("/get")
+    public List<Device> viewAllDevices() {
+        return inventoryService.viewAllDevices();
+    }
 
-	2.	Run the Java class:
+    @PostMapping("/add")
+    public Device addDevice(@RequestBody Device device) {
+        return inventoryService.addDevice(device);
+    }
 
-mvn exec:java -Dexec.mainClass="com.yang.parser.YangModelParser"
+    @GetMapping("/{id}")
+    public ResponseEntity<Device> getDeviceById(@PathVariable long id) {
+        return inventoryService.viewDeviceById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deleteDevice(@PathVariable long id) {
+        inventoryService.deleteDevice(id);
+        return ResponseEntity.ok("Device deleted successfully");
+    }
 
-	3.	Expected Output:
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Device> updateDevice(@PathVariable long id, @RequestBody Device updatedDevice) {
+        return ResponseEntity.ok(inventoryService.updateDevice(id, updatedDevice));
+    }
 
-Parsed YANG Model: [SchemaContext information]
-YANG Model Validation Successful!
+    @GetMapping("/filter")
+    public List<Device> filterDevices(@RequestParam String status) {
+        return inventoryService.filterDevices(status);
+    }
 
+    @GetMapping("/connected")
+    public List<Device> viewAllConnectedDevices() {
+        return inventoryService.viewAllConnectedDevices();
+    }
+}
+3. DeviceDiscoveryController.java
+java
+Copy
+Edit
+package com.example.nms.controller;
 
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-⸻
+import com.example.nms.serviceimpl.DeviceDiscoveryService;
 
-Summary of Fixes
+@RestController
+public class DeviceDiscoveryController {
 
-✅ Fixed Incorrect Library Usage → Replaced com.tailf.jnc.YangNode with SchemaContext from OpenDaylight.
-✅ Updated Dependencies → Added yang-data-impl and yang-common dependencies.
-✅ Rewrote Parsing Code → Used YangParserFactoryImpl to parse YANG files correctly.
-✅ Validated YANG Schema → Used OpenDaylight’s SchemaContext for YANG validation.
+    private final DeviceDiscoveryService deviceDiscoveryService;
 
-This should fix your problem! Let me know if you need further clarifications.
+    public DeviceDiscoveryController(DeviceDiscoveryService deviceDiscoveryService) {
+        this.deviceDiscoveryService = deviceDiscoveryService;
+    }
+
+    @GetMapping("/discover")
+    public String discoverDevice(@RequestParam String ipAddress) {
+        deviceDiscoveryService.discoverDevice(ipAddress);
+        return "Discovery initiated for IP: " + ipAddress;
+    }
+}
+4. Device.java (Entity Class)
+java
+Copy
+Edit
+package com.example.nms.inventory.entity;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "device")
+public class Device {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    private String type;
+    private String ipAddress;
+    private String vendor;
+    private String status;
+
+    public Device() {}
+
+    public Device(Long id, String type, String ipAddress, String vendor, String status) {
+        this.id = id;
+        this.type = type;
+        this.ipAddress = ipAddress;
+        this.vendor = vendor;
+        this.status = status;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
+    }
+
+    public String getVendor() {
+        return vendor;
+    }
+
+    public void setVendor(String vendor) {
+        this.vendor = vendor;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}
+5. DeviceRepository.java
+java
+Copy
+Edit
+package com.example.nms.inventory.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import com.example.nms.inventory.entity.Device;
+
+@Repository
+public interface DeviceRepository extends JpaRepository<Device, Long> {}
+6. InventoryService.java (Service Interface)
+java
+Copy
+Edit
+package com.example.nms.serviceimpl;
+
+import java.util.List;
+import java.util.Optional;
+
+import com.example.nms.inventory.entity.Device;
+
+public interface InventoryService {
+
+    Device addDevice(Device device);
+
+    Optional<Device> viewDeviceById(long id);
+
+    List<Device> viewAllDevices();
+
+    List<Device> viewAllConnectedDevices();
+
+    void deleteDevice(Long id);
+
+    Device updateDevice(long id, Device updatedDevice);
+
+    List<Device> filterDevices(String status);
+}
+7. InventoryServiceImpl.java
+java
+Copy
+Edit
+package com.example.nms.serviceimpl;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.example.nms.discovery.SnmpDiscovery;
+import com.example.nms.inventory.entity.Device;
+import com.example.nms.inventory.repository.DeviceRepository;
+
+@Service
+public class InventoryServiceImpl implements InventoryService {
+
+    @Autowired
+    private DeviceRepository deviceRepo;
+
+    @Autowired
+    private SnmpDiscovery snmpDiscovery;
+
+    @Override
+    public Device addDevice(Device device) {
+        return deviceRepo.save(device);
+    }
+
+    @Override
+    public List<Device> viewAllDevices() {
+        return deviceRepo.findAll();
+    }
+
+    @Override
+    public Optional<Device> viewDeviceById(long id) {
+        return deviceRepo.findById(id);
+    }
+
+    @Override
+    public List<Device> viewAllConnectedDevices() {
+        List<Device> connectedDevices = snmpDiscovery.getConnectedDevices().stream()
+                .map(ip -> deviceRepo.findAll().stream()
+                        .filter(device -> ip.equals(device.getIpAddress()))
+                        .findFirst().orElse(null))
+                .filter(device -> device != null)
+                .collect(Collectors.toList());
+        return connectedDevices;
+    }
+
+    @Override
+    public void deleteDevice(Long id) {
+        deviceRepo.deleteById(id);
+    }
+
+    @Override
+    public Device updateDevice(long id, Device updatedDevice) {
+        return deviceRepo.findById(id)
+                .map(device -> {
+                    device.setType(updatedDevice.getType());
+                    device.setIpAddress(updatedDevice.getIpAddress());
+                    device.setVendor(updatedDevice.getVendor());
+                    device.setStatus(updatedDevice.getStatus());
+                    return deviceRepo.save(device);
+                })
+                .orElseThrow(() -> new RuntimeException("Device with ID " + id + " not found"));
+    }
+
+    @Override
+    public List<Device> filterDevices(String status) {
+        return deviceRepo.findAll().stream()
+                .filter(device -> status.equalsIgnoreCase(device.getStatus()))
+                .collect(Collectors.toList());
+    }
+}
+8. SnmpDiscovery.java
+java
+Copy
+Edit
+package com.example.nms.discovery;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class SnmpDiscovery {
+
+    public List<String> getConnectedDevices() {
+        // Mock implementation for connected devices
+        List<String> devices = new ArrayList<>();
+        devices.add("192.168.1.2");
+        devices.add("192.168.1.3");
+        return devices;
+    }
+}

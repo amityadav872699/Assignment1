@@ -1,184 +1,93 @@
-Updated DeviceController.java
-java
-Copy
-Edit
-package com.example.nms.controller;
+package com.wipro.network;
 
-import java.util.List;
-import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import com.example.nms.inventory.entity.Device;
-import com.example.nms.serviceimpl.InventoryService;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.util.Collections;
+import java.util.Enumeration;
 
-@RestController
-@RequestMapping("/api/devices")
-public class DeviceController {
+import com.sun.net.httpserver.HttpServer;
 
-    @Autowired
-    private InventoryService inventoryService;
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.exporter.PushGateway;
 
-    @GetMapping("/get")
-    public List<Device> viewAllDevices() {
-        return inventoryService.viewAllDevices();
+public class NetworkTelemetryAgent {
+    private static final Gauge latencyGauge = Gauge.build()
+            .name("network_latency_ms")
+            .help("Network latency in milliseconds")
+            .register();
+
+    private static final Gauge bandwidthGauge = Gauge.build()
+            .name("network_bandwidth_mbps")
+            .help("Network bandwidth usage in Mbps")
+            .register();
+
+    public static void main(String[] args) throws IOException {
+        // Start HTTP Server for Prometheus
+        HttpServer server = HttpServer.create(new InetSocketAddress(9091), 0);
+        HTTPServer prometheusServer = new HTTPServer(server, CollectorRegistry.defaultRegistry, true);
+        System.out.println("Prometheus HTTP server started on port 9091");
+        
+        // PushGateway setup
+        PushGateway pushGateway = new PushGateway("localhost:9091");
+
+        while (true) {
+            System.out.println("Collecting network metrics...");
+            double latency = measureLatency();
+            double bandwidth = estimateBandwidth();
+            
+            // Update Prometheus metrics
+            latencyGauge.set(latency);
+            bandwidthGauge.set(bandwidth);
+            
+            System.out.printf("Latency: %.2fms, Bandwidth: %.2fMbps\n", latency, bandwidth);
+            System.out.println("Pushing metrics to Prometheus...");
+            
+            // Push metrics to Prometheus PushGateway
+            pushGateway.push(CollectorRegistry.defaultRegistry, "network_agent");
+            
+            System.out.println("Metrics successfully pushed!");
+            
+            // Alert if latency > 100ms
+            if (latency > 100) {
+                System.out.println("ALERT: High latency detected! " + latency + " ms");
+            }
+
+            // Sleep before next cycle
+            try {
+                Thread.sleep(5000); // 5 seconds
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 
-    @PostMapping("/add")
-    public Device addDevice(@RequestBody Device device) {
-        return inventoryService.addDevice(device);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Device> getDeviceById(@PathVariable long id) {
-        return inventoryService.viewDeviceById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    @PutMapping("/update/{id}")
-    public ResponseEntity<Device> updateDevice(@PathVariable long id, @RequestBody Device updatedDevice) {
-        return inventoryService.viewDeviceById(id)
-                .map(device -> {
-                    device.setType(updatedDevice.getType());
-                    device.setIpAddress(updatedDevice.getIpAddress());
-                    device.setVendor(updatedDevice.getVendor());
-                    device.setStatus(updatedDevice.getStatus());
-                    return ResponseEntity.ok(inventoryService.addDevice(device));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<String> deleteDevice(@PathVariable long id) {
-        inventoryService.deleteDevice(id);
-        return ResponseEntity.ok("Device deleted successfully");
-    }
-
-    @GetMapping("/connected")
-    public List<Device> getConnectedDevices() {
-        return inventoryService.viewAllConnectedDevices();
-    }
-
-    @GetMapping("/filter")
-    public List<Device> filterDevices(@RequestParam String status) {
-        return inventoryService.viewAllDevices().stream()
-                .filter(device -> status.equalsIgnoreCase(device.getStatus()))
-                .collect(Collectors.toList());
-    }
-}
-Updated InventoryService Interface
-java
-Copy
-Edit
-package com.example.nms.serviceimpl;
-
-import java.util.List;
-import java.util.Optional;
-
-import com.example.nms.inventory.entity.Device;
-
-public interface InventoryService {
-
-    Device addDevice(Device device);
-
-    Optional<Device> viewDeviceById(long id);
-
-    List<Device> viewAllDevices();
-
-    List<Device> viewAllConnectedDevices();
-
-    void deleteDevice(Long id); // New method
-
-    List<Device> filterDevices(String status); // Optional for future extensions
-}
-Updated InventoryServiceImpl.java
-java
-Copy
-Edit
-package com.example.nms.serviceimpl;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import com.example.nms.discovery.SnmpDiscovery;
-import com.example.nms.inventory.entity.Device;
-import com.example.nms.inventory.repository.DeviceRepository;
-
-@Service
-public class InventoryServiceImpl implements InventoryService {
-
-    @Autowired
-    private DeviceRepository deviceRepo;
-
-    @Autowired
-    private SnmpDiscovery snmpDiscovery;
-
-    @Override
-    public Device addDevice(Device device) {
-        return deviceRepo.save(device);
-    }
-
-    @Override
-    public List<Device> viewAllDevices() {
-        return deviceRepo.findAll();
-    }
-
-    @Override
-    public Optional<Device> viewDeviceById(long id) {
-        return deviceRepo.findById(id);
-    }
-
-    @Override
-    public List<Device> viewAllConnectedDevices() {
-        List<Device> connectedDevices = new ArrayList<>();
+    private static double measureLatency() {
         try {
-            List<String> connectedIpAddresses = snmpDiscovery.getConnectedDevices();
-            connectedDevices = deviceRepo.findAll().stream()
-                    .filter(device -> connectedIpAddresses.contains(device.getIpAddress()))
-                    .collect(Collectors.toList());
+            Process process = new ProcessBuilder("ping", "-c", "1", "8.8.8.8").start();
+            process.waitFor();
+            return Math.random() * 100; // Simulate random latency for now
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static double estimateBandwidth() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            for (NetworkInterface netIf : Collections.list(interfaces)) {
+                if (!netIf.isLoopback()) {
+                    return netIf.getMTU() / 1024.0; // Approximate bandwidth in Mbps
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return connectedDevices;
-    }
-
-    @Override
-    public void deleteDevice(Long id) {
-        deviceRepo.deleteById(id);
-    }
-
-    @Override
-    public List<Device> filterDevices(String status) {
-        return deviceRepo.findAll().stream()
-                .filter(device -> status.equalsIgnoreCase(device.getStatus()))
-                .collect(Collectors.toList());
+        return 0;
     }
 }
-API Endpoints
-Get All Devices
-GET /api/devices/get
-
-Get Device by ID
-GET /api/devices/{id}
-
-Add a New Device
-POST /api/devices/add
-
-Update a Device
-PUT /api/devices/update/{id}
-
-Delete a Device
-DELETE /api/devices/delete/{id}
-
-Get All Connected Devices
-GET /api/devices/connected
-
-Filter Devices by Status
-GET /api/devices/filter?status=<status>
